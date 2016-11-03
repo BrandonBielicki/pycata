@@ -23,13 +23,15 @@ def delFromDir(path):
   for f in filelist:
       os.remove(f)
   
-def getGtfs(url, path):
-  delFromDir("gtfs/*")
+def getGtfs(url, directory, filename):
+  if not os.path.exists(directory):
+    os.makedirs(directory)
+  delFromDir(directory + "/*")
   response = urllib2.urlopen(url)
   zipcontent = response.read()
-  with open(path, 'w') as f:
+  with open(directory+"/"+filename, 'w') as f:
       f.write(zipcontent)
-  extractZip("gtfs/gtfs.zip", "gtfs")
+  extractZip(directory+"/"+filename, directory)
 
 def firebaseCall(_url, _method, _data):
   if(_method == "post"):
@@ -48,7 +50,7 @@ feed = gtfs_realtime_pb2.FeedMessage()
 feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
 firebaseCall(fb_timestamp_url,"put",str(feed.header.timestamp));
 print(feed.header.timestamp)
-getGtfs(ftp_url, "gtfs/gtfs.zip")
+getGtfs(ftp_url, "gtfs", "gtfs.zip")
 
 
 #for entity in feed.entity:
