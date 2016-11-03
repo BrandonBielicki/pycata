@@ -6,13 +6,39 @@ import requests
 import os
 import glob
 import zipfile
+import MySQLdb
 
 auth_key=auth.auth_key
 ftp_url=auth.ftp_url
+db_host=auth.db_host
+db_user=auth.db_user
+db_pass=auth.db_pass
+db_db=auth.db_db
 fb_timestamp_url="https://sizzling-fire-5776.firebaseio.com/timestamp.json?auth="+auth_key
+fb_shapes_url="https://sizzling-fire-5776.firebaseio.com/shapes.json?auth="+auth_key
 feed_url="http://developers.cata.org/gtfsrt/GTFS-RealTime/TrapezeRealTimeFeed.pb"
 vehicle_feed_url="http://developers.cata.org/gtfsrt/vehicle/vehiclepositions.pb"
 
+db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
+conn = db.cursor()
+
+def loadFile(conn, name, table):
+  conn.execute('LOAD DATA LOCAL INFILE "/home/brandon/dev/pycata/backend/gtfs/'+name+'"INTO TABLE '+table+' FIELDS TERMINATED BY "," LINES TERMINATED BY "\n" IGNORE 1 LINES')
+  db.commit()
+  db.close()
+  
+def uploadGtfs(conn):
+  loadFile(conn,"shapes.txt","shapes")
+  loadFile(conn,"trips.txt","trips")
+  loadFile(conn,"stops.txt","stops")
+  loadFile(conn,"routes.txt","routes")
+  loadFile(conn,"stop_times.txt","stop_times")
+  
+def updateShapes():
+  with open("gtfs/shapes.txt") as in_file:
+   for line in in_file:
+    print(line)
+     
 def extractZip(in_path, out_path):
   zip_file = zipfile.ZipFile(in_path, 'r')
   zip_file.extractall(out_path)
@@ -50,8 +76,9 @@ feed = gtfs_realtime_pb2.FeedMessage()
 feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
 firebaseCall(fb_timestamp_url,"put",str(feed.header.timestamp));
 print(feed.header.timestamp)
-getGtfs(ftp_url, "gtfs", "gtfs.zip")
-
+#getGtfs(ftp_url, "gtfs", "gtfs.zip")
+#updateShapes()
+uploadGtfs(conn)
 
 #for entity in feed.entity:
 #  print (entity.trip_update)
