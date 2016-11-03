@@ -5,6 +5,7 @@ import auth
 import requests
 import os
 import glob
+import zipfile
 
 auth_key=auth.auth_key
 ftp_url=auth.ftp_url
@@ -12,14 +13,23 @@ fb_timestamp_url="https://sizzling-fire-5776.firebaseio.com/timestamp.json?auth=
 feed_url="http://developers.cata.org/gtfsrt/GTFS-RealTime/TrapezeRealTimeFeed.pb"
 vehicle_feed_url="http://developers.cata.org/gtfsrt/vehicle/vehiclepositions.pb"
 
-def getGtfs(url):
-  filelist = glob.glob("gtfs/*")
+def extractZip(in_path, out_path):
+  zip_file = zipfile.ZipFile(in_path, 'r')
+  zip_file.extractall(out_path)
+  zip_file.close()
+  
+def delFromDir(path):
+  filelist = glob.glob(path)
   for f in filelist:
       os.remove(f)
+  
+def getGtfs(url, path):
+  delFromDir("gtfs/*")
   response = urllib2.urlopen(url)
-  zipcontent= response.read()
-  with open("gtfs/gtfs.zip", 'w') as f:
-      f.write(zipcontent)  
+  zipcontent = response.read()
+  with open(path, 'w') as f:
+      f.write(zipcontent)
+  extractZip("gtfs/gtfs.zip", "gtfs")
 
 def firebaseCall(_url, _method, _data):
   if(_method == "post"):
@@ -38,7 +48,7 @@ feed = gtfs_realtime_pb2.FeedMessage()
 feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
 firebaseCall(fb_timestamp_url,"put",str(feed.header.timestamp));
 print(feed.header.timestamp)
-getGtfs(ftp_url)
+getGtfs(ftp_url, "gtfs/gtfs.zip")
 
 
 #for entity in feed.entity:
