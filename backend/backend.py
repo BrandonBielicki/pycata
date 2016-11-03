@@ -1,13 +1,25 @@
 #import gtfs_realtime_pb2
 from google.transit import gtfs_realtime_pb2
-import urllib
+import urllib2
 import auth
 import requests
+import os
+import glob
 
 auth_key=auth.auth_key
 ftp_url=auth.ftp_url
 fb_timestamp_url="https://sizzling-fire-5776.firebaseio.com/timestamp.json?auth="+auth_key
 feed_url="http://developers.cata.org/gtfsrt/GTFS-RealTime/TrapezeRealTimeFeed.pb"
+vehicle_feed_url="http://developers.cata.org/gtfsrt/vehicle/vehiclepositions.pb"
+
+def getGtfs(url):
+  filelist = glob.glob("gtfs/*")
+  for f in filelist:
+      os.remove(f)
+  response = urllib2.urlopen(url)
+  zipcontent= response.read()
+  with open("gtfs/gtfs.zip", 'w') as f:
+      f.write(zipcontent)  
 
 def firebaseCall(_url, _method, _data):
   if(_method == "post"):
@@ -23,12 +35,11 @@ def firebaseCall(_url, _method, _data):
   return response
   
 feed = gtfs_realtime_pb2.FeedMessage()
-response = urllib.urlopen(feed_url)
-feed.ParseFromString(response.read())
+feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
 firebaseCall(fb_timestamp_url,"put",str(feed.header.timestamp));
 print(feed.header.timestamp)
+getGtfs(ftp_url)
 
 
-for entity in feed.entity:
-  if entity.HasField('trip_update'):
-    print (entity.trip_update)
+#for entity in feed.entity:
+#  print (entity.trip_update)
