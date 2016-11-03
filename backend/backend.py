@@ -22,17 +22,16 @@ vehicle_feed_url="http://developers.cata.org/gtfsrt/vehicle/vehiclepositions.pb"
 db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
 conn = db.cursor()
 
-def loadFile(conn, name, table):
-  conn.execute('LOAD DATA LOCAL INFILE "/home/brandon/dev/pycata/backend/gtfs/'+name+'"INTO TABLE '+table+' FIELDS TERMINATED BY "," LINES TERMINATED BY "\n" IGNORE 1 LINES')
+def loadFile(conn, name, table, col_str):
+  conn.execute('LOAD DATA LOCAL INFILE "/home/brandon/dev/pycata/backend/gtfs/'+name+'"INTO TABLE '+table+' FIELDS TERMINATED BY "," IGNORE 1 LINES '+col_str)
   db.commit()
-  db.close()
   
 def uploadGtfs(conn):
-  loadFile(conn,"shapes.txt","shapes")
-  loadFile(conn,"trips.txt","trips")
-  loadFile(conn,"stops.txt","stops")
-  loadFile(conn,"routes.txt","routes")
-  loadFile(conn,"stop_times.txt","stop_times")
+  loadFile(conn,"shapes.txt","shapes","")
+  #loadFile(conn,"trips.txt","trips")
+  #loadFile(conn,"stops.txt","stops")
+  loadFile(conn,"routes.txt","routes","(route_id,@col2,@col3,route_long_name,@col5,@col6,@col7,route_color,@col9)")
+  #loadFile(conn,"stop_times.txt","stop_times")
   
 def updateShapes():
   with open("gtfs/shapes.txt") as in_file:
