@@ -14,10 +14,10 @@ db_host=auth.db_host
 db_user=auth.db_user
 db_pass=auth.db_pass
 db_db=auth.db_db
-fb_timestamp_url="https://sizzling-fire-5776.firebaseio.com/timestamp.json?auth="+auth_key
-fb_shapes_url="https://sizzling-fire-5776.firebaseio.com/shapes.json?auth="+auth_key
-feed_url="http://developers.cata.org/gtfsrt/GTFS-RealTime/TrapezeRealTimeFeed.pb"
-vehicle_feed_url="http://developers.cata.org/gtfsrt/vehicle/vehiclepositions.pb"
+fb_timestamp_url=auth.fb_timestamp_url
+fb_shapes_url=auth.fb_shapes_url
+feed_url=auth.feed_url
+vehicle_feed_url=auth.vehicle_feed_url
 
 db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
 conn = db.cursor()
@@ -28,10 +28,10 @@ def loadFile(conn, name, table, col_str):
   
 def uploadGtfs(conn):
   loadFile(conn,"shapes.txt","shapes","")
-  #loadFile(conn,"trips.txt","trips")
-  #loadFile(conn,"stops.txt","stops")
-  loadFile(conn,"routes.txt","routes","(route_id,@col2,@col3,route_long_name,@col5,@col6,@col7,route_color,@col9)")
-  #loadFile(conn,"stop_times.txt","stop_times")
+  loadFile(conn,"trips.txt","trips","(route_id,service_id,trip_id,head_sign,@col5,direction,block_id,shape_id,@col9,@col10)")
+  loadFile(conn,"stops.txt","stops","(id,code,name,description,latitude,longitude)")
+  loadFile(conn,"routes.txt","routes","(id,@col2,@col3,name,@col5,@col6,@col7,color,@col9)")
+  loadFile(conn,"stop_times.txt","stop_times","(trip_id,arrival,departure,stop_id,stop_sequence,@col6,@col7,@col8,@col9)")
   
 def updateShapes():
   with open("gtfs/shapes.txt") as in_file:
