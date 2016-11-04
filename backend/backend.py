@@ -25,6 +25,9 @@ vehicle_feed_url=auth.vehicle_feed_url
 db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
 conn = db.cursor()
 
+def getCurrentTime():
+  return int(round(time.time()*1000))
+          
 def clearSqlGtfs(conn):
   conn.execute('delete from trips;')
   conn.execute('delete from routes;')
@@ -87,20 +90,17 @@ def firebaseCall(_url, _method, _data):
   code = response.status_code
   return response
   
-clearSqlGtfs(conn)
-getGtfs(ftp_url,"gtfs","gtfs.txt")
-uploadGtfs(conn)
 sync()
-start = int(round(time.time()*1000))
+timer = getCurrentTime()
 while(False):
-  if(int(round(time.time()*1000) - start) >= (1000*60*60*24*7)):
+  if(getCurrentTime() - timer >= (1000*60*60*24*7)):
     clearSqlGtfs(conn)
     getGtfs(ftp_url,"gtfs","gtfs.txt")
     uploadGtfs(conn)
     sync()
-    start = int(round(time.time()*1000))
-  if(int(round(time.time()*1000) - start) >= (1000*30)):  
-    start = int(round(time.time()*1000))
+    timer = getCurrentTime()
+  if(getCurrentTime() - timer >= (1000*30)):  
+    timer = getCurrentTime()
     print("UPDATE")
     
   
