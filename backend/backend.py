@@ -8,6 +8,8 @@ import glob
 import zipfile
 import MySQLdb
 import time
+import warnings
+warnings.filterwarnings('ignore', category=MySQLdb.Warning)
 
 auth_key=auth.auth_key
 ftp_url=auth.ftp_url
@@ -85,6 +87,9 @@ def firebaseCall(_url, _method, _data):
   code = response.status_code
   return response
   
+clearSqlGtfs(conn)
+getGtfs(ftp_url,"gtfs","gtfs.txt")
+uploadGtfs(conn)
 sync()
 start = int(round(time.time()*1000))
 while(False):
