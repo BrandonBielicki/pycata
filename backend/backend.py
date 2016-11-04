@@ -7,6 +7,7 @@ import os
 import glob
 import zipfile
 import MySQLdb
+import time
 
 auth_key=auth.auth_key
 ftp_url=auth.ftp_url
@@ -22,6 +23,24 @@ vehicle_feed_url=auth.vehicle_feed_url
 db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
 conn = db.cursor()
 
+def clearSqlGtfs(conn):
+  conn.execute('delete from trips;')
+  conn.execute('delete from routes;')
+  conn.execute('delete from shapes;')
+  conn.execute('delete from stops;')
+  conn.execute('delete from stop_times;')
+  db.commit()
+
+def sync():
+  feed = gtfs_realtime_pb2.FeedMessage()
+  feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
+  timestamp1 = feed.header.timestamp
+  timestamp2 = feed.header.timestamp
+  print("syncing")
+  while(timestamp1 == timestamp2):
+    feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
+    timestamp2 = feed.header.timestamp
+
 def loadFile(conn, name, table, col_str):
   conn.execute('LOAD DATA LOCAL INFILE "/home/brandon/dev/pycata/backend/gtfs/'+name+'"INTO TABLE '+table+' FIELDS TERMINATED BY "," IGNORE 1 LINES '+col_str)
   db.commit()
@@ -32,11 +51,6 @@ def uploadGtfs(conn):
   loadFile(conn,"stops.txt","stops","(id,code,name,description,latitude,longitude)")
   loadFile(conn,"routes.txt","routes","(id,@col2,@col3,name,@col5,@col6,@col7,color,@col9)")
   loadFile(conn,"stop_times.txt","stop_times","(trip_id,arrival,departure,stop_id,stop_sequence,@col6,@col7,@col8,@col9)")
-  
-def updateShapes():
-  with open("gtfs/shapes.txt") as in_file:
-   for line in in_file:
-    print(line)
      
 def extractZip(in_path, out_path):
   zip_file = zipfile.ZipFile(in_path, 'r')
@@ -71,13 +85,29 @@ def firebaseCall(_url, _method, _data):
   code = response.status_code
   return response
   
-feed = gtfs_realtime_pb2.FeedMessage()
-feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
-firebaseCall(fb_timestamp_url,"put",str(feed.header.timestamp));
-print(feed.header.timestamp)
+sync()
+start = int(round(time.time()*1000))
+while(False):
+  if(int(round(time.time()*1000) - start) >= (1000*60*60*24*7)):
+    clearSqlGtfs(conn)
+    getGtfs(ftp_url,"gtfs","gtfs.txt")
+    uploadGtfs(conn)
+    sync()
+    start = int(round(time.time()*1000))
+  if(int(round(time.time()*1000) - start) >= (1000*30)):  
+    start = int(round(time.time()*1000))
+    print("UPDATE")
+    
+  
+
+#feed = gtfs_realtime_pb2.FeedMessage()
+#feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
+#firebaseCall(fb_timestamp_url,"put",str(feed.header.timestamp));
+#print(feed.header.timestamp)
 #getGtfs(ftp_url, "gtfs", "gtfs.zip")
 #updateShapes()
-uploadGtfs(conn)
+#uploadGtfs(conn)
+
 
 #for entity in feed.entity:
 #  print (entity.trip_update)

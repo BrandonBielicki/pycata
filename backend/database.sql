@@ -41,6 +41,6 @@ CREATE TABLE stop_times(
     departure time,
     stop_id int NOT NULL,
     stop_sequence int,
-    PRIMARY KEY(trip_id,stop_id)
+    PRIMARY KEY(trip_id,stop_id,stop_sequence)
 );
 
