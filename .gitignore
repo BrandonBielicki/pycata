@@ -1,0 +1,4 @@
+auth.*
+*.zip
+*.txt
+*.pyc
