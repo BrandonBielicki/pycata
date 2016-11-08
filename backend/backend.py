@@ -149,7 +149,14 @@ def updateVehicles():
   update_str = update_str.replace(", }"," }")
   firebaseCall(fb_vehicle_url,"put",update_str)
 
-#sync()
+clearSqlGtfs(conn)
+getGtfs(ftp_url,"gtfs","gtfs.txt")
+uploadGtfs(conn)
+deleteVehicles()
+updateVehicles()
+deleteTrips()
+updateTrips()
+sync()
 timer = getCurrentTime()
 while(True):
   if(getCurrentTime() - timer >= (1000*60*60*24*7)):
@@ -161,8 +168,8 @@ while(True):
   if(getCurrentTime() - timer >= (1000*30)):  
     timer = getCurrentTime()
     updateTimeStamp()
-    deleteVehicles()
-    updateVehicles()
+    #deleteVehicles()
+    #updateVehicles()
     deleteTrips()
     updateTrips()
   
