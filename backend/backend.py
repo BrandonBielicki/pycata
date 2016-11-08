@@ -18,8 +18,10 @@ db_user=auth.db_user
 db_pass=auth.db_pass
 db_db=auth.db_db
 fb_timestamp_url=auth.fb_timestamp_url
-fb_shapes_url=auth.fb_shapes_url
+fb_vehicle_url=auth.fb_vehicle_url
+fb_trip_url=auth.fb_trip_url
 feed_url=auth.feed_url
+trip_feed_url=auth.trip_feed_url
 vehicle_feed_url=auth.vehicle_feed_url
 
 db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
@@ -47,7 +49,7 @@ def sync():
     timestamp2 = feed.header.timestamp
 
 def loadFile(conn, name, table, col_str):
-  conn.execute('LOAD DATA LOCAL INFILE "/home/brandon/dev/pycata/backend/gtfs/'+name+'"INTO TABLE '+table+' FIELDS TERMINATED BY "," IGNORE 1 LINES '+col_str)
+  conn.execute('LOAD DATA LOCAL INFILE "/root/dev/pycata/backend/gtfs/'+name+'"INTO TABLE '+table+' FIELDS TERMINATED BY "," IGNORE 1 LINES '+col_str)
   db.commit()
   
 def uploadGtfs(conn):
@@ -85,14 +87,66 @@ def firebaseCall(_url, _method, _data):
   elif(_method == "put"):
     response = requests.put(_url, _data)
   elif(_method == "delete"):
-    response = requests.delete(_url, _data)
+    response = requests.delete(_url)
   content = response.content
   code = response.status_code
   return response
   
-sync()
+def updateTimeStamp():
+  feed = gtfs_realtime_pb2.FeedMessage()
+  feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
+  firebaseCall(fb_timestamp_url,"put",str(feed.header.timestamp))
+
+def deleteTrips():
+  firebaseCall(fb_trip_url,"delete","")
+  
+def updateTrips():
+  feed = gtfs_realtime_pb2.FeedMessage()
+  feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
+  update_str="{ "
+  for entity in feed.entity:
+    _id=entity.id
+    _route_id=entity.trip_update.trip.route_id
+    _vehicle_id=entity.trip_update.vehicle.id
+    update_str += "\"" + _id + "\" : { \"Route\": \"" + _route_id + "\", \"BusNumber\": \"" + _vehicle_id + "\", \"Stops\": {"
+    for stop in entity.trip_update.stop_time_update:
+      stop_seq = stop.stop_sequence
+      delay = stop.arrival.delay
+      arrival = stop.arrival.time
+      departure = stop.departure.time
+      stop_id = stop.stop_id
+      update_str += "\"" + str(stop_seq) + "\" : { \"Delay\": \"" + str(delay) +"\", \"Arrival\": \""+ str(arrival) + "\", \"Departure\": \""+ str(departure) + "\", \"stop_id\": \"" + str(stop_id) + "\"}, "
+    update_str += "} }, "  
+  
+  update_str += " }"
+  update_str = update_str.replace(", }"," }")
+  update_str = update_str.replace(",  }"," }")
+  print(update_str)
+  firebaseCall(fb_trip_url,"put",update_str)
+
+def deleteVehicles():
+  firebaseCall(fb_vehicle_url,"delete","")
+  
+def updateVehicles():
+  feed = gtfs_realtime_pb2.FeedMessage()
+  feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
+  update_str="{ "
+  for entity in feed.entity:
+    _id=entity.id
+    _lat=entity.vehicle.position.latitude
+    _long=entity.vehicle.position.longitude
+    _trip_id=entity.vehicle.trip.trip_id
+    _route_id=entity.vehicle.trip.route_id
+    update_str+="\"" + _id + "\" : { \"Trip\": \"" + _trip_id +"\", \"Lat\": \""+ str(_lat) + "\", \"Long\": \"" + str(_long) + "\" },";
+  
+  update_str += " }"
+  update_str = update_str.replace(", }"," }")
+  #print(update_str)
+  firebaseCall(fb_vehicle_url,"put",update_str)
+
+#sync()
 timer = getCurrentTime()
-while(False):
+while(True):
   if(getCurrentTime() - timer >= (1000*60*60*24*7)):
     clearSqlGtfs(conn)
     getGtfs(ftp_url,"gtfs","gtfs.txt")
@@ -101,13 +155,14 @@ while(False):
     timer = getCurrentTime()
   if(getCurrentTime() - timer >= (1000*30)):  
     timer = getCurrentTime()
-    print("UPDATE")
-    
+    updateTimeStamp()
+    deleteVehicles()
+    updateVehicles()
+    deleteTrips()
+    updateTrips()
   
 
-#feed = gtfs_realtime_pb2.FeedMessage()
-#feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
-#firebaseCall(fb_timestamp_url,"put",str(feed.header.timestamp));
+
 #print(feed.header.timestamp)
 #getGtfs(ftp_url, "gtfs", "gtfs.zip")
 #updateShapes()
