@@ -20,6 +20,7 @@ db_db=auth.db_db
 fb_timestamp_url=auth.fb_timestamp_url
 fb_vehicle_url=auth.fb_vehicle_url
 fb_trip_url=auth.fb_trip_url
+fb_stop_url=auth.fb_stop_url
 feed_url=auth.feed_url
 trip_feed_url=auth.trip_feed_url
 vehicle_feed_url=auth.vehicle_feed_url
@@ -123,39 +124,44 @@ def updateTrips():
       departure = stop.departure.time
       stop_id = stop.stop_id
       update_str += "\"" + str(stop_seq) + "\" : { \"delay\": \"" + str(delay) +"\", \"arrival\": \""+ str(arrival) + "\", \"departure\": \""+ str(departure) + "\", \"stop_id\": \"" + str(stop_id) + "\"}, "
-    update_str += "} }, "  
-  
+    update_str += "} }, "
+    
   update_str += " }"
   update_str = update_str.replace(", }"," }")
   update_str = update_str.replace(",  }"," }")
   firebaseCall(fb_trip_url,"put",update_str)
 
-def deleteVehicles():
-  firebaseCall(fb_vehicle_url,"delete","")
-  
-def updateVehicles():
+def updateStops():
   feed = gtfs_realtime_pb2.FeedMessage()
-  feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
-  update_str="{ "
+  feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
+  stops={}
   for entity in feed.entity:
-    _id=entity.id
-    _lat=entity.vehicle.position.latitude
-    _long=entity.vehicle.position.longitude
-    _trip_id=entity.vehicle.trip.trip_id
-    _route_id=entity.vehicle.trip.route_id
-    update_str+="\"" + _id + "\" : { \"trip\": \"" + _trip_id +"\", \"lat\": \""+ str(_lat) + "\", \"long\": \"" + str(_long) + "\" },";
+    _route_id=entity.trip_update.trip.route_id
+    if(_route_id not in stops):
+      stops[_route_id]=[]
+    for stop in entity.trip_update.stop_time_update:
+      stop_id = stop.stop_id
+      stops[_route_id].append(str(stop_id))
   
-  update_str += " }"
-  update_str = update_str.replace(", }"," }")
-  firebaseCall(fb_vehicle_url,"put",update_str)
+    stop_str = "{ "
+    for key, value in stops.iteritems():
+      stop_names = set(value)
+      stop_str += "\"" + key + "\" : { "
+      for item in stop_names:
+        stop_str += "\""+ item +"\": { \"lat\": \"y\", \"long\": \"y\"}, "
+      stop_str += "},"
+    
+  stop_str += " }" 
+  stop_str = stop_str.replace(", }"," }")
+  stop_str = stop_str.replace(",  }"," }")
+  firebaseCall(fb_stop_url,"put",stop_str)
 
 clearSqlGtfs(conn)
 getGtfs(ftp_url,"gtfs","gtfs.txt")
 uploadGtfs(conn)
-deleteVehicles()
-updateVehicles()
 deleteTrips()
 updateTrips()
+updateStops()
 sync()
 timer = getCurrentTime()
 while(True):
@@ -168,10 +174,9 @@ while(True):
   if(getCurrentTime() - timer >= (1000*30)):  
     timer = getCurrentTime()
     updateTimeStamp()
-    #deleteVehicles()
-    #updateVehicles()
     deleteTrips()
     updateTrips()
+    updateStops()
   
 
 
