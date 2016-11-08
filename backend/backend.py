@@ -151,7 +151,14 @@ def updateStops():
       stop_names = set(value)
       stop_str += "\"" + key + "\" : { "
       for item in stop_names:
-        stop_str += "\""+ item +"\": { \"lat\": \"x\", \"long\": \"x\"}, "
+        _lat=0
+        _long=0
+        conn.execute("SELECT latitude, longitude FROM stops WHERE code='"+ item +"'")
+        row = conn.fetchone()
+        if row is not None:
+          _lat=row[0]
+          _long=row[1]
+        stop_str += "\""+ item +"\": { \"lat\": \""+str(_lat)+"\", \"long\": \""+str(_long)+"\"}, "
       stop_str += "},"
     
   stop_str += " }" 
@@ -159,9 +166,9 @@ def updateStops():
   stop_str = stop_str.replace(",  }"," }")
   firebaseCall(fb_stop_url,"put",stop_str)
 
-clearSqlGtfs(conn)
-getGtfs(ftp_url,"gtfs","gtfs.txt")
-uploadGtfs(conn)
+#clearSqlGtfs(conn)
+#getGtfs(ftp_url,"gtfs","gtfs.txt")
+#uploadGtfs(conn)
 deleteTrips()
 updateTrips()
 updateStops()
@@ -171,7 +178,7 @@ while(True):
   if(getCurrentTime() - timer >= (1000*60*60*24*7)):
     clearSqlGtfs(conn)
     getGtfs(ftp_url,"gtfs","gtfs.txt")
-    uploadGtfs(conn)
+    uploadGtfs()
     deleteStops()
     sync()
     timer = getCurrentTime()
