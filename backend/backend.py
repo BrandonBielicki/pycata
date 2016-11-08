@@ -121,7 +121,6 @@ def updateTrips():
   update_str += " }"
   update_str = update_str.replace(", }"," }")
   update_str = update_str.replace(",  }"," }")
-  print(update_str)
   firebaseCall(fb_trip_url,"put",update_str)
 
 def deleteVehicles():
@@ -141,7 +140,6 @@ def updateVehicles():
   
   update_str += " }"
   update_str = update_str.replace(", }"," }")
-  #print(update_str)
   firebaseCall(fb_vehicle_url,"put",update_str)
 
 #sync()
