@@ -131,6 +131,9 @@ def updateTrips():
   update_str = update_str.replace(",  }"," }")
   firebaseCall(fb_trip_url,"put",update_str)
 
+def deleteStops():
+  firebaseCall(fb_stop_url,"delete","")
+
 def updateStops():
   feed = gtfs_realtime_pb2.FeedMessage()
   feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
@@ -148,7 +151,7 @@ def updateStops():
       stop_names = set(value)
       stop_str += "\"" + key + "\" : { "
       for item in stop_names:
-        stop_str += "\""+ item +"\": { \"lat\": \"y\", \"long\": \"y\"}, "
+        stop_str += "\""+ item +"\": { \"lat\": \"x\", \"long\": \"x\"}, "
       stop_str += "},"
     
   stop_str += " }" 
@@ -169,6 +172,7 @@ while(True):
     clearSqlGtfs(conn)
     getGtfs(ftp_url,"gtfs","gtfs.txt")
     uploadGtfs(conn)
+    deleteStops()
     sync()
     timer = getCurrentTime()
   if(getCurrentTime() - timer >= (1000*30)):  
@@ -177,14 +181,3 @@ while(True):
     deleteTrips()
     updateTrips()
     updateStops()
-  
-
-
-#print(feed.header.timestamp)
-#getGtfs(ftp_url, "gtfs", "gtfs.zip")
-#updateShapes()
-#uploadGtfs(conn)
-
-
-#for entity in feed.entity:
-#  print (entity.trip_update)
