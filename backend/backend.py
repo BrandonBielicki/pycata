@@ -81,90 +81,114 @@ def getGtfs(url, directory, filename):
   extractZip(directory+"/"+filename, directory)
 
 def firebaseCall(_url, _method, _data):
-  if(_method == "post"):
-    response = requests.post(_url, _data)
-  elif(_method == "get"):
-    response = requests.get(_url, _data)
-  elif(_method == "put"):
-    response = requests.put(_url, _data)
-  elif(_method == "delete"):
-    response = requests.delete(_url)
-  content = response.content
-  code = response.status_code
-  return response
+  try:
+    if(_method == "post"):
+      response = requests.post(_url, _data)
+    elif(_method == "get"):
+      response = requests.get(_url, _data)
+    elif(_method == "put"):
+      response = requests.put(_url, _data)
+    elif(_method == "delete"):
+      response = requests.delete(_url)
+    elif(_method == "patch"):
+      response = requests.patch(_url, _data)
+    content = response.content
+    code = response.status_code
+    return True
+  except:
+    return False
   
 def updateTimeStamp():
-  feed = gtfs_realtime_pb2.FeedMessage()
-  feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
-  firebaseCall(fb_timestamp_url,"put",str(feed.header.timestamp))
+  try:
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
+    firebaseCall(fb_timestamp_url,"put",str(feed.header.timestamp))
+  except:
+    return False
 
 def deleteTrips():
-  firebaseCall(fb_trip_url,"delete","")
+  try:
+    firebaseCall(fb_trip_url,"delete","")
+    return True
+  except:
+    return False
   
 def updateTrips():
-  vFeed = gtfs_realtime_pb2.FeedMessage()
-  vFeed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
-  buses={}
-  for entity in vFeed.entity:
-    buses[entity.id] = [entity.vehicle.position.latitude, entity.vehicle.position.longitude]
-  feed = gtfs_realtime_pb2.FeedMessage()
-  feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
-  update_str="{ "
-  for entity in feed.entity:
-    _id=entity.id
-    _route_id=entity.trip_update.trip.route_id
-    _vehicle_id=entity.trip_update.vehicle.id
-    _lat = buses[_vehicle_id][0]
-    _long = buses[_vehicle_id][1]
-    update_str += "\"" + _id + "\" : { \"route\": \"" + _route_id + "\", \"bus\": \"" + _vehicle_id + "\", \"lat\": \"" + str(_lat) + "\", \"long\": \"" + str(_long) + "\", \"stops\": {"
-    for stop in entity.trip_update.stop_time_update:
-      stop_seq = stop.stop_sequence
-      delay = stop.arrival.delay
-      arrival = stop.arrival.time
-      departure = stop.departure.time
-      stop_id = stop.stop_id
-      update_str += "\"" + str(stop_seq) + "\" : { \"delay\": \"" + str(delay) +"\", \"arrival\": \""+ str(arrival) + "\", \"departure\": \""+ str(departure) + "\", \"stop_id\": \"" + str(stop_id) + "\"}, "
-    update_str += "} }, "
-    
-  update_str += " }"
-  update_str = update_str.replace(", }"," }")
-  update_str = update_str.replace(",  }"," }")
-  firebaseCall(fb_trip_url,"put",update_str)
+  try:
+    vFeed = gtfs_realtime_pb2.FeedMessage()
+    vFeed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
+    buses={}
+    for entity in vFeed.entity:
+      buses[entity.id] = [entity.vehicle.position.latitude, entity.vehicle.position.longitude]
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
+    update_str="{ "
+    for entity in feed.entity:
+      _id=entity.id
+      _route_id=entity.trip_update.trip.route_id
+      _vehicle_id=entity.trip_update.vehicle.id
+      _lat = buses[_vehicle_id][0]
+      _long = buses[_vehicle_id][1]
+      update_str += "\"" + _id + "\" : { \"route\": \"" + _route_id + "\", \"bus\": \"" + _vehicle_id + "\", \"latitude\": \"" + str(_lat) + "\", \"longitude\": \"" + str(_long) + "\", \"stops\": {"
+      for stop in entity.trip_update.stop_time_update:
+        stop_seq = stop.stop_sequence
+        delay = stop.arrival.delay
+        arrival = stop.arrival.time
+        departure = stop.departure.time
+        stop_id = stop.stop_id
+        update_str += "\"" + str(stop_seq) + "\" : { \"delay\": \"" + str(delay) +"\", \"arrival\": \""+ str(arrival) + "\", \"departure\": \""+ str(departure) + "\", \"stop_id\": \"" + str(stop_id) + "\"}, "
+      update_str += "} }, "
+      
+    update_str += " }"
+    update_str = update_str.replace(", }"," }")
+    update_str = update_str.replace(",  }"," }")
+    firebaseCall(fb_trip_url,"put",update_str)
+    return True
+  except:
+    return False
 
 def deleteStops():
-  firebaseCall(fb_stop_url,"delete","")
+  try:
+    firebaseCall(fb_stop_url,"delete","")
+    return True
+  except:
+    return False
 
 def updateStops():
-  feed = gtfs_realtime_pb2.FeedMessage()
-  feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
-  stops={}
-  for entity in feed.entity:
-    _route_id=entity.trip_update.trip.route_id
-    if(_route_id not in stops):
-      stops[_route_id]=[]
-    for stop in entity.trip_update.stop_time_update:
-      stop_id = stop.stop_id
-      stops[_route_id].append(str(stop_id))
-  
-    stop_str = "{ "
-    for key, value in stops.iteritems():
-      stop_names = set(value)
-      stop_str += "\"" + key + "\" : { "
-      for item in stop_names:
-        _lat=0
-        _long=0
-        conn.execute("SELECT latitude, longitude FROM stops WHERE code='"+ item +"'")
-        row = conn.fetchone()
-        if row is not None:
-          _lat=row[0]
-          _long=row[1]
-        stop_str += "\""+ item +"\": { \"lat\": \""+str(_lat)+"\", \"long\": \""+str(_long)+"\"}, "
-      stop_str += "},"
+  try:
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
+    stops={}
+    for entity in feed.entity:
+      _route_id=entity.trip_update.trip.route_id
+      if(_route_id not in stops):
+        stops[_route_id]=[]
+      for stop in entity.trip_update.stop_time_update:
+        stop_id = stop.stop_id
+        stops[_route_id].append(str(stop_id))
     
-  stop_str += " }" 
-  stop_str = stop_str.replace(", }"," }")
-  stop_str = stop_str.replace(",  }"," }")
-  firebaseCall(fb_stop_url,"put",stop_str)
+      stop_str = "{ "
+      for key, value in stops.iteritems():
+        stop_names = set(value)
+        stop_str += "\"" + key + "\" : { "
+        for item in stop_names:
+          _lat=0
+          _long=0
+          conn.execute("SELECT latitude, longitude FROM stops WHERE code='"+ item +"'")
+          row = conn.fetchone()
+          if row is not None:
+            _lat=row[0]
+            _long=row[1]
+          stop_str += "\""+ item +"\": { \"latitude\": \""+str(_lat)+"\", \"longitude\": \""+str(_long)+"\"}, "
+        stop_str += "},"
+      
+    stop_str += " }" 
+    stop_str = stop_str.replace(", }"," }")
+    stop_str = stop_str.replace(",  }"," }")
+    firebaseCall(fb_stop_url,"patch",stop_str)
+    return True
+  except:
+    return False
 
 #clearSqlGtfs(conn)
 #getGtfs(ftp_url,"gtfs","gtfs.txt")
