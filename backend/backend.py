@@ -9,6 +9,7 @@ import zipfile
 import MySQLdb
 import time
 import warnings
+import json
 warnings.filterwarnings('ignore', category=MySQLdb.Warning)
 
 auth_key=auth.auth_key
@@ -85,7 +86,7 @@ def firebaseCall(_url, _method, _data):
     if(_method == "post"):
       response = requests.post(_url, _data)
     elif(_method == "get"):
-      response = requests.get(_url, _data)
+      response = requests.get(_url)
     elif(_method == "put"):
       response = requests.put(_url, _data)
     elif(_method == "delete"):
@@ -94,7 +95,7 @@ def firebaseCall(_url, _method, _data):
       response = requests.patch(_url, _data)
     content = response.content
     code = response.status_code
-    return True
+    return response
   except:
     return False
   
@@ -159,6 +160,17 @@ def updateStops():
     feed = gtfs_realtime_pb2.FeedMessage()
     feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
     stops={}
+    
+    ################## QUESTIONABLE ##################
+    json_data = json.loads(firebaseCall(fb_stop_url,"get","").content)
+    for key, value in json_data.iteritems():
+      _route_num = key
+      if(_route_num not in stops):
+        stops[_route_num]=[]
+      for key, value in value.iteritems():
+        stops[_route_num].append(str(key))
+    ################## QUESTIONABLE ##################
+    
     for entity in feed.entity:
       _route_id=entity.trip_update.trip.route_id
       if(_route_id not in stops):
@@ -206,9 +218,11 @@ while(True):
     deleteStops()
     sync()
     timer = getCurrentTime()
-  if(getCurrentTime() - timer >= (1000*30)):  
+  if(getCurrentTime() - timer >= (1000*30)):
+    print("Starting main loop")
     timer = getCurrentTime()
     updateTimeStamp()
     deleteTrips()
     updateTrips()
     updateStops()
+    print("Loop took " + str((getCurrentTime()-timer)/1000) + " seconds")
