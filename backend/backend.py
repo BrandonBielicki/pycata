@@ -202,15 +202,17 @@ def updateStops():
   except:
     return False
 
-#clearSqlGtfs(conn)
-#getGtfs(ftp_url,"gtfs","gtfs.txt")
-#uploadGtfs(conn)
+clearSqlGtfs(conn)
+getGtfs(ftp_url,"gtfs","gtfs.txt")
+uploadGtfs(conn)
 deleteTrips()
 updateTrips()
 updateStops()
 sync()
 timer = getCurrentTime()
 while(True):
+  if(getCurrentTime() - timer >= (1000*60*60*24)):
+    sync()
   if(getCurrentTime() - timer >= (1000*60*60*24*7)):
     clearSqlGtfs(conn)
     getGtfs(ftp_url,"gtfs","gtfs.txt")
