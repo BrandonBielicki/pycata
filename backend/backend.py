@@ -2,6 +2,7 @@
 from google.transit import gtfs_realtime_pb2
 import urllib2
 import auth
+import GTFS
 import requests
 import os
 import glob
@@ -10,6 +11,7 @@ import MySQLdb
 import time
 import warnings
 import json
+import threading
 warnings.filterwarnings('ignore', category=MySQLdb.Warning)
 
 auth_key=auth.auth_key
@@ -26,20 +28,9 @@ feed_url=auth.feed_url
 trip_feed_url=auth.trip_feed_url
 vehicle_feed_url=auth.vehicle_feed_url
 
-db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
-conn = db.cursor()
-
 def getCurrentTime():
   return int(round(time.time()*1000))
           
-def clearSqlGtfs(conn):
-  conn.execute('delete from trips;')
-  conn.execute('delete from routes;')
-  conn.execute('delete from shapes;')
-  conn.execute('delete from stops;')
-  conn.execute('delete from stop_times;')
-  db.commit()
-
 def sync():
   feed = gtfs_realtime_pb2.FeedMessage()
   feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
@@ -49,38 +40,7 @@ def sync():
   while(timestamp1 == timestamp2):
     feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
     timestamp2 = feed.header.timestamp
-
-def loadFile(conn, name, table, col_str):
-  conn.execute('LOAD DATA LOCAL INFILE "/root/dev/pycata/backend/gtfs/'+name+'"INTO TABLE '+table+' FIELDS TERMINATED BY "," IGNORE 1 LINES '+col_str)
-  db.commit()
-  
-def uploadGtfs(conn):
-  loadFile(conn,"shapes.txt","shapes","")
-  loadFile(conn,"trips.txt","trips","(route_id,service_id,trip_id,head_sign,@col5,direction,block_id,shape_id,@col9,@col10)")
-  loadFile(conn,"stops.txt","stops","(id,code,name,description,latitude,longitude)")
-  loadFile(conn,"routes.txt","routes","(id,@col2,@col3,name,@col5,@col6,@col7,color,@col9)")
-  loadFile(conn,"stop_times.txt","stop_times","(trip_id,arrival,departure,stop_id,stop_sequence,@col6,@col7,@col8,@col9)")
-     
-def extractZip(in_path, out_path):
-  zip_file = zipfile.ZipFile(in_path, 'r')
-  zip_file.extractall(out_path)
-  zip_file.close()
-  
-def delFromDir(path):
-  filelist = glob.glob(path)
-  for f in filelist:
-      os.remove(f)
-  
-def getGtfs(url, directory, filename):
-  if not os.path.exists(directory):
-    os.makedirs(directory)
-  delFromDir(directory + "/*")
-  response = urllib2.urlopen(url)
-  zipcontent = response.read()
-  with open(directory+"/"+filename, 'w') as f:
-      f.write(zipcontent)
-  extractZip(directory+"/"+filename, directory)
-
+           
 def firebaseCall(_url, _method, _data):
   try:
     if(_method == "post"):
@@ -163,12 +123,13 @@ def updateStops():
     
     ################## QUESTIONABLE ##################
     json_data = json.loads(firebaseCall(fb_stop_url,"get","").content)
-    for key, value in json_data.iteritems():
-      _route_num = key
-      if(_route_num not in stops):
-        stops[_route_num]=[]
-      for key, value in value.iteritems():
-        stops[_route_num].append(str(key))
+    if(json_data is not None):
+      for key, value in json_data.iteritems():
+        _route_num = key
+        if(_route_num not in stops):
+          stops[_route_num]=[]
+        for key, value in value.iteritems():
+          stops[_route_num].append(str(key))
     ################## QUESTIONABLE ##################
     
     for entity in feed.entity:
@@ -202,29 +163,28 @@ def updateStops():
   except:
     return False
 
-clearSqlGtfs(conn)
-getGtfs(ftp_url,"gtfs","gtfs.txt")
-uploadGtfs(conn)
-deleteTrips()
+db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
+conn = db.cursor()
+gtfs_sql = GTFS.GTFS(conn, db, ftp_url,"gtfs","gtfs.txt")
+
+gtfs_sql.fullUpdate()
+#deleteTrips()
 updateTrips()
-updateStops()
+updateStopsThread.start()
 sync()
 timer = getCurrentTime()
-while(True):
+while(False):
   if(getCurrentTime() - timer >= (1000*60*60*24)):
     sync()
   if(getCurrentTime() - timer >= (1000*60*60*24*7)):
-    clearSqlGtfs(conn)
-    getGtfs(ftp_url,"gtfs","gtfs.txt")
-    uploadGtfs()
+    gtfs_sql.fullUpdate()
     deleteStops()
     sync()
     timer = getCurrentTime()
-  if(getCurrentTime() - timer >= (1000*30)):
+  if(getCurrentTime() - timer >= (1000*15)):
     print("Starting main loop")
     timer = getCurrentTime()
     updateTimeStamp()
-    deleteTrips()
+    #deleteTrips()
     updateTrips()
-    updateStops()
     print("Loop took " + str((getCurrentTime()-timer)/1000) + " seconds")
