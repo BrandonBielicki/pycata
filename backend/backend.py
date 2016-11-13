@@ -1,4 +1,3 @@
-#import gtfs_realtime_pb2
 from google.transit import gtfs_realtime_pb2
 import urllib2
 import auth
@@ -87,6 +86,8 @@ def updateTrips():
     for entity in feed.entity:
       _id=entity.id
       _route_id=entity.trip_update.trip.route_id
+      if(str(_route_id) == "261"):
+        _route_id ="26"
       _vehicle_id=entity.trip_update.vehicle.id
       _lat = buses[_vehicle_id][0]
       _long = buses[_vehicle_id][1]
@@ -158,7 +159,7 @@ def updateStops():
     stop_str += " }" 
     stop_str = stop_str.replace(", }"," }")
     stop_str = stop_str.replace(",  }"," }")
-    firebaseCall(fb_stop_url,"patch",stop_str)
+    firebaseCall(fb_stop_url,"put",stop_str)
     return True
   except:
     return False
@@ -166,25 +167,33 @@ def updateStops():
 db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
 conn = db.cursor()
 gtfs_sql = GTFS.GTFS(conn, db, ftp_url,"gtfs","gtfs.txt")
+updateStopsThread = threading.Thread(target=updateStops)
 
 gtfs_sql.fullUpdate()
+#deleteStops()
 #deleteTrips()
 updateTrips()
-updateStopsThread.start()
+updateStops()
 sync()
 timer = getCurrentTime()
-while(False):
-  if(getCurrentTime() - timer >= (1000*60*60*24)):
-    sync()
+while(True):
   if(getCurrentTime() - timer >= (1000*60*60*24*7)):
     gtfs_sql.fullUpdate()
     deleteStops()
     sync()
     timer = getCurrentTime()
-  if(getCurrentTime() - timer >= (1000*15)):
+  if(getCurrentTime() - timer >= (1000*30)):
+    if(getCurrentTime() - timer >= (1000*60*60*24)):
+      synch_time = getCurrentTime()
+      print("Hourly Sync")
+      sync()
+      print("    Sync took " + getCurrentTime()-synch_time + " seconds")
     print("Starting main loop")
     timer = getCurrentTime()
     updateTimeStamp()
     #deleteTrips()
     updateTrips()
+    if(not updateStopsThread.isAlive()):
+      updateStopsThread = threading.Thread(target=updateStops)
+      updateStopsThread.start()
     print("Loop took " + str((getCurrentTime()-timer)/1000) + " seconds")
