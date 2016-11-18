@@ -143,10 +143,9 @@ def updateStops():
         stop_id = stop.stop_id
         stops[_route_id].append(str(stop_id))
     
-      stop_str = "{ "
       for key, value in stops.iteritems():
         stop_names = set(value)
-        stop_str += "\"" + key + "\" : { "
+        _route_id = key
         for item in stop_names:
           _lat=0
           _long=0
@@ -157,18 +156,13 @@ def updateStops():
             _code = row[1]
             _lat=row[2]
             _long=row[3]
-          stop_str += "\""+ item +"\": { \"id\": \""+str(_id)+"\", \"code\": \""+str(_code)+"\", \"latitude\": \""+str(_lat)+"\", \"longitude\": \""+str(_long)+"\"}, "
-        stop_str += "},"
-      
-    stop_str += " }" 
-    stop_str = stop_str.replace(", }"," }")
-    stop_str = stop_str.replace(",  }"," }")
-    firebaseCall(fb_stop_url,"put",stop_str)
+            test ="{ \"id\": \""+str(_id)+"\", \"code\": \""+str(_code)+"\", \"latitude\": \""+str(_lat)+"\", \"longitude\": \""+str(_long)+"\"}"
+            firebaseCall(fb_base_url+"/stops/"+str(_route_id)+"/"+item+".json?auth="+auth_key,"patch",test)
     return True
   except:
     return False
 
-def updateStopTimes():
+def updateStopTimes(bottom, top):
   def getTripsFromRoute(feed, route):
     trips=[]
     for entity in feed.entity:
@@ -180,46 +174,57 @@ def updateStopTimes():
         trips.append(_trip_id)
     return trips
     
-  #try:
-  feed = gtfs_realtime_pb2.FeedMessage()
-  feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
-  json_data = json.loads(firebaseCall(fb_stop_url,"get","").content)
-  if(json_data is not None):
-    for key, value in json_data.iteritems():
-      _route_num = key
-      trips = getTripsFromRoute(feed,_route_num)
-      cur_time = str(datetime.datetime.strftime(datetime.datetime.now(), '%H:%M:%S'))
-      if(len(trips) > 0):
-        trip_id=str(trips[0])
-        for key, value in value.iteritems():
-            _stop_code = key
-            stop_id = str(value['id'])
-            sql_stmt="select arrival from trips t, stop_times s where service_id=(select service_id from trips where trip_id="+trip_id+") and t.trip_id=s.trip_id and t.route_id="+_route_num+" and s.stop_id="+stop_id+" and arrival>='"+cur_time+"' order by arrival limit 3"
-            conn.execute(sql_stmt)
-            time="0"
-            try:
-              time=conn.fetchone()[0]
-            except:
-              x=1
-            update_str="{ "
-            update_str += "\"1\" : \""+str(time)+"\"}"
-            firebaseCall(fb_base_url+"/stops/"+str(_route_num)+"/"+str(_stop_code)+".json?auth="+auth_key,"patch",update_str) 
-      #return True
-  #except:
-  #  return False
+  try:
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
+    json_data = json.loads(firebaseCall(fb_stop_url,"get","").content)
+    if(json_data is not None):
+      for key, value in json_data.iteritems():
+        if(int(key) > bottom and int(key) <= top):
+          _route_num = key
+          trips = getTripsFromRoute(feed,_route_num)
+          cur_time = str(datetime.datetime.strftime(datetime.datetime.now(), '%H:%M:%S'))
+          if(len(trips) > 0):
+            trip_id=str(trips[0])
+            for key, value in value.iteritems():
+                _stop_code = key
+                stop_id = str(value['id'])
+                sql_stmt="select arrival from trips t, stop_times s where service_id=(select service_id from trips where trip_id="+trip_id+") and t.trip_id=s.trip_id and t.route_id="+_route_num+" and s.stop_id="+stop_id+" and arrival>='"+cur_time+"' order by arrival limit 3"
+                conn.execute(sql_stmt)
+                time="0"
+                try:
+                  time=conn.fetchone()[0]
+                except:
+                  x=1
+                update_str="{ "
+                update_str += "\"1\" : \""+str(time)+"\"}"
+                firebaseCall(fb_base_url+"/stops/"+str(_route_num)+"/"+str(_stop_code)+".json?auth="+auth_key,"patch",update_str) 
+    return True
+  except:
+    return False
 
 db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
 conn = db.cursor()
 gtfs_sql = GTFS.GTFS(conn, db, ftp_url,"gtfs","gtfs.txt")
 updateStopsThread = threading.Thread(target=updateStops)
+updateStopTimesThread = threading.Thread(target=updateStopTimes, args=(0,50))
+#updateStopTimesThread10 = threading.Thread(target=updateStopTimes, args=(0,10))
+#updateStopTimesThread20 = threading.Thread(target=updateStopTimes, args=(10,20))
+#updateStopTimesThread30 = threading.Thread(target=updateStopTimes, args=(20,30))
+#updateStopTimesThread40 = threading.Thread(target=updateStopTimes, args=(30,50))
 
-updateStopTimes()
 #gtfs_sql.fullUpdate()
-#updateTrips()
-#deleteStops()
-#updateStops()
+#updateStopTimes(0,10)
+#updateStopTimes(10,20)
+#updateStopTimes(20,30)
+#updateStopTimes(30,50)
+#updateStopsThread.start()
+#updateStopTimesThread10.start()
+#updateStopTimesThread20.start()
+#updateStopTimesThread30.start()
+#updateStopTimesThread40.start()
 timer = getCurrentTime()
-while(False):
+while(True):
   if(getCurrentTime() - timer >= (1000*60*60*24*7)):
     gtfs_sql.fullUpdate()
     deleteStops()
@@ -230,6 +235,28 @@ while(False):
     updateTimeStamp()
     updateTrips()
     if(not updateStopsThread.isAlive()):
+      print("    Starting stops thread")
       updateStopsThread = threading.Thread(target=updateStops)
       updateStopsThread.start()
+      
+    #if(not updateStopTimesThread.isAlive()):
+    #  print("    Starting stop times thread")
+    #  updateStopTimesThread = threading.Thread(target=updateStopTimes, args=(0,50))
+    #  updateStopTimesThread.start()
+    #if(not updateStopTimesThread10.isAlive()):
+    #  print("    Starting 10")
+    #  UpdateStopTimesThread10 = threading.Thread(target=updateStopTimes, args=(0,10))
+    #  UpdateStopTimesThread10.start()
+    #if(not updateStopTimesThread20.isAlive()):
+    #  print("    Starting 20")
+    #  UpdateStopTimesThread20 = threading.Thread(target=updateStopTimes, args=(10,20))
+    #  UpdateStopTimesThread20.start()
+    #if(not updateStopTimesThread30.isAlive()):
+    #  print("    Starting 30")
+    #  UpdateStopTimesThread30 = threading.Thread(target=updateStopTimes, args=(20,30))
+    #  UpdateStopTimesThread30.start()
+    #if(not updateStopTimesThread40.isAlive()):
+    #  print("    Starting 40")
+    #  UpdateStopTimesThread40 = threading.Thread(target=updateStopTimes, args=(30,50))
+    #  UpdateStopTimesThread40.start()
     print("Loop took " + str((getCurrentTime()-timer)/1000) + " seconds")
