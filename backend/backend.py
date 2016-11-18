@@ -11,6 +11,7 @@ import time
 import warnings
 import json
 import threading
+import datetime
 warnings.filterwarnings('ignore', category=MySQLdb.Warning)
 
 auth_key=auth.auth_key
@@ -23,6 +24,7 @@ fb_timestamp_url=auth.fb_timestamp_url
 fb_vehicle_url=auth.fb_vehicle_url
 fb_trip_url=auth.fb_trip_url
 fb_stop_url=auth.fb_stop_url
+fb_base_url=auth.fb_base_url
 feed_url=auth.feed_url
 trip_feed_url=auth.trip_feed_url
 vehicle_feed_url=auth.vehicle_feed_url
@@ -148,12 +150,14 @@ def updateStops():
         for item in stop_names:
           _lat=0
           _long=0
-          conn.execute("SELECT latitude, longitude FROM stops WHERE code='"+ item +"'")
+          conn.execute("SELECT id, code, latitude, longitude FROM stops WHERE code='"+ item +"'")
           row = conn.fetchone()
           if row is not None:
-            _lat=row[0]
-            _long=row[1]
-          stop_str += "\""+ item +"\": { \"latitude\": \""+str(_lat)+"\", \"longitude\": \""+str(_long)+"\"}, "
+            _id = row[0]
+            _code = row[1]
+            _lat=row[2]
+            _long=row[3]
+          stop_str += "\""+ item +"\": { \"id\": \""+str(_id)+"\", \"code\": \""+str(_code)+"\", \"latitude\": \""+str(_lat)+"\", \"longitude\": \""+str(_long)+"\"}, "
         stop_str += "},"
       
     stop_str += " }" 
@@ -164,34 +168,66 @@ def updateStops():
   except:
     return False
 
+def updateStopTimes():
+  def getTripsFromRoute(feed, route):
+    trips=[]
+    for entity in feed.entity:
+      _trip_id=entity.id
+      _route_id=entity.trip_update.trip.route_id
+      if(str(_route_id) == "261"):
+        _route_id ="26"
+      if(_route_id == route):
+        trips.append(_trip_id)
+    return trips
+    
+  #try:
+  feed = gtfs_realtime_pb2.FeedMessage()
+  feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
+  json_data = json.loads(firebaseCall(fb_stop_url,"get","").content)
+  if(json_data is not None):
+    for key, value in json_data.iteritems():
+      _route_num = key
+      trips = getTripsFromRoute(feed,_route_num)
+      cur_time = str(datetime.datetime.strftime(datetime.datetime.now(), '%H:%M:%S'))
+      if(len(trips) > 0):
+        trip_id=str(trips[0])
+        for key, value in value.iteritems():
+            _stop_code = key
+            stop_id = str(value['id'])
+            sql_stmt="select arrival from trips t, stop_times s where service_id=(select service_id from trips where trip_id="+trip_id+") and t.trip_id=s.trip_id and t.route_id="+_route_num+" and s.stop_id="+stop_id+" and arrival>='"+cur_time+"' order by arrival limit 3"
+            conn.execute(sql_stmt)
+            time="0"
+            try:
+              time=conn.fetchone()[0]
+            except:
+              x=1
+            update_str="{ "
+            update_str += "\"1\" : \""+str(time)+"\"}"
+            firebaseCall(fb_base_url+"/stops/"+str(_route_num)+"/"+str(_stop_code)+".json?auth="+auth_key,"patch",update_str) 
+      #return True
+  #except:
+  #  return False
+
 db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
 conn = db.cursor()
 gtfs_sql = GTFS.GTFS(conn, db, ftp_url,"gtfs","gtfs.txt")
 updateStopsThread = threading.Thread(target=updateStops)
 
-gtfs_sql.fullUpdate()
+updateStopTimes()
+#gtfs_sql.fullUpdate()
+#updateTrips()
 #deleteStops()
-#deleteTrips()
-updateTrips()
-updateStops()
-sync()
+#updateStops()
 timer = getCurrentTime()
-while(True):
+while(False):
   if(getCurrentTime() - timer >= (1000*60*60*24*7)):
     gtfs_sql.fullUpdate()
     deleteStops()
-    sync()
     timer = getCurrentTime()
-  if(getCurrentTime() - timer >= (1000*30)):
-    if(getCurrentTime() - timer >= (1000*60*60*24)):
-      synch_time = getCurrentTime()
-      print("Hourly Sync")
-      sync()
-      print("    Sync took " + getCurrentTime()-synch_time + " seconds")
+  if(getCurrentTime() - timer >= (1000*5)):
     print("Starting main loop")
     timer = getCurrentTime()
     updateTimeStamp()
-    #deleteTrips()
     updateTrips()
     if(not updateStopsThread.isAlive()):
       updateStopsThread = threading.Thread(target=updateStops)
