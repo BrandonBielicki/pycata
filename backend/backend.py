@@ -10,7 +10,7 @@ import MySQLdb
 import time
 import warnings
 import json
-import threading
+from multiprocessing import Process
 import datetime
 warnings.filterwarnings('ignore', category=MySQLdb.Warning)
 
@@ -203,32 +203,44 @@ def updateStopTimes(bottom, top):
   except:
     return False
 
-def startStopTimesThreads():
+def startThreads():
+  global updateStopTimesThread10
+  global updateStopTimesThread20
+  global updateStopTimesThread30
+  global updateStopTimesThread40
+  global updateStopsThread
+  
+  if(not updateStopsThread.is_alive()):
+    print("    Starting stops thread")
+    updateStopsThread = Process(target=updateStops)
+    updateStopsThread.start()
+    updateStopsThread.join()
   if(not updateStopTimesThread10.isAlive()):
     print("    Starting 10")
-    UpdateStopTimesThread10 = threading.Thread(target=updateStopTimes, args=(0,10))
-    UpdateStopTimesThread10.start()
-  if(not updateStopTimesThread20.isAlive()):
-    print("    Starting 20")
-    UpdateStopTimesThread20 = threading.Thread(target=updateStopTimes, args=(10,20))
-    UpdateStopTimesThread20.start()
-  if(not updateStopTimesThread30.isAlive()):
-    print("    Starting 30")
-    UpdateStopTimesThread30 = threading.Thread(target=updateStopTimes, args=(20,30))
-    UpdateStopTimesThread30.start()
-  if(not updateStopTimesThread40.isAlive()):
-    print("    Starting 40")
-    UpdateStopTimesThread40 = threading.Thread(target=updateStopTimes, args=(30,50))
-    UpdateStopTimesThread40.start()
+    updateStopTimesThread10 = Process(target=updateStopTimes, args=(0,10))
+    updateStopTimesThread10.start()
+    updateStopTimesThread10.join()
+  #if(not updateStopTimesThread20.isAlive()):
+  #  print("    Starting 20")
+  #  updateStopTimesThread20 = threading.Thread(target=updateStopTimes, args=(10,20))
+  #  updateStopTimesThread20.start()
+  #if(not updateStopTimesThread30.isAlive()):
+  #  print("    Starting 30")
+  #  updateStopTimesThread30 = threading.Thread(target=updateStopTimes, args=(20,30))
+  #  updateStopTimesThread30.start()
+  #if(not updateStopTimesThread40.isAlive()):
+  #  print("    Starting 40")
+  #  updateStopTimesThread40 = threading.Thread(target=updateStopTimes, args=(30,50))
+  #  updateStopTimesThread40.start()
 
 db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
 conn = db.cursor()
 gtfs_sql = GTFS.GTFS(conn, db, ftp_url,"gtfs","gtfs.txt")
-updateStopsThread = threading.Thread(target=updateStops)
-updateStopTimesThread10 = threading.Thread(target=updateStopTimes, args=(0,10))
-updateStopTimesThread20 = threading.Thread(target=updateStopTimes, args=(10,20))
-updateStopTimesThread30 = threading.Thread(target=updateStopTimes, args=(20,30))
-updateStopTimesThread40 = threading.Thread(target=updateStopTimes, args=(30,50))
+updateStopsThread = Process(target=updateStops)
+updateStopTimesThread10 = Process(target=updateStopTimes, args=(0,10))
+updateStopTimesThread20 = Process(target=updateStopTimes, args=(10,20))
+updateStopTimesThread30 = Process(target=updateStopTimes, args=(20,30))
+updateStopTimesThread40 = Process(target=updateStopTimes, args=(30,50))
 
 #gtfs_sql.fullUpdate()
 timer = getCurrentTime()
@@ -242,10 +254,5 @@ while(True):
     timer = getCurrentTime()
     updateTimeStamp()
     updateTrips()
-    #if(not updateStopsThread.isAlive()):
-    #  print("    Starting stops thread")
-    #  updateStopsThread = threading.Thread(target=updateStops)
-    #  updateStopsThread.start()
-    startStopTimesThreads()
-    
+    startThreads()
     print("Loop took " + str((getCurrentTime()-timer)/1000) + " seconds")
