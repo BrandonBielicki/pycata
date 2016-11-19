@@ -147,19 +147,24 @@ def updateStops():
         stop_names = set(value)
         _route_id = key
         for item in stop_names:
-          _lat=0
-          _long=0
-          conn.execute("SELECT id, code, latitude, longitude FROM stops WHERE code='"+ item +"'")
-          row = conn.fetchone()
-          if row is not None:
-            _id = row[0]
-            _code = row[1]
-            _lat=row[2]
-            _long=row[3]
-            test ="{ \"id\": \""+str(_id)+"\", \"code\": \""+str(_code)+"\", \"latitude\": \""+str(_lat)+"\", \"longitude\": \""+str(_long)+"\"}"
-            firebaseCall(fb_base_url+"/stops/"+str(_route_id)+"/"+item+".json?auth="+auth_key,"patch",test)
+          try:
+            _lat=0
+            _long=0
+            conn.execute("SELECT id, code, latitude, longitude FROM stops WHERE code='"+ item +"'")
+            row = conn.fetchone()
+            if row is not None:
+              _id = row[0]
+              _code = row[1]
+              _lat=row[2]
+              _long=row[3]
+              test ="{ \"id\": \""+str(_id)+"\", \"code\": \""+str(_code)+"\", \"latitude\": \""+str(_lat)+"\", \"longitude\": \""+str(_long)+"\"}"
+              firebaseCall(fb_base_url+"/stops/"+str(_route_id)+"/"+item+".json?auth="+auth_key,"patch",test)
+          except:
+            #print("    Error in " + item + " route " + _route_id )
+            x=1
     return True
   except:
+    print("    Error in updateStops")
     return False
 
 def updateStopTimes(bottom, top):
@@ -173,7 +178,7 @@ def updateStopTimes(bottom, top):
       if(_route_id == route):
         trips.append(_trip_id)
     return trips
-    
+     
   try:
     feed = gtfs_realtime_pb2.FeedMessage()
     feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
@@ -201,6 +206,7 @@ def updateStopTimes(bottom, top):
                 firebaseCall(fb_base_url+"/stops/"+str(_route_num)+"/"+str(_stop_code)+".json?auth="+auth_key,"patch",update_str) 
     return True
   except:
+    print("Error in updateStopTimes")
     return False
 
 def startThreads():
@@ -210,28 +216,26 @@ def startThreads():
   global updateStopTimesThread40
   global updateStopsThread
   
+  if(not updateStopTimesThread10.is_alive()):
+    print("    Starting 10")
+    updateStopTimesThread10 = Process(target=updateStopTimes, args=(0,10))
+    updateStopTimesThread10.start()
+  if(not updateStopTimesThread20.is_alive()):
+    print("    Starting 20")
+    updateStopTimesThread20 = Process(target=updateStopTimes, args=(10,20))
+    updateStopTimesThread20.start()
+  if(not updateStopTimesThread30.is_alive()):
+    print("    Starting 30")
+    updateStopTimesThread30 = Process(target=updateStopTimes, args=(20,30))
+    updateStopTimesThread30.start()
+  if(not updateStopTimesThread40.is_alive()):
+    print("    Starting 40")
+    updateStopTimesThread40 = Process(target=updateStopTimes, args=(30,50))
+    updateStopTimesThread40.start()
   if(not updateStopsThread.is_alive()):
     print("    Starting stops thread")
     updateStopsThread = Process(target=updateStops)
     updateStopsThread.start()
-    updateStopsThread.join()
-  if(not updateStopTimesThread10.isAlive()):
-    print("    Starting 10")
-    updateStopTimesThread10 = Process(target=updateStopTimes, args=(0,10))
-    updateStopTimesThread10.start()
-    updateStopTimesThread10.join()
-  #if(not updateStopTimesThread20.isAlive()):
-  #  print("    Starting 20")
-  #  updateStopTimesThread20 = threading.Thread(target=updateStopTimes, args=(10,20))
-  #  updateStopTimesThread20.start()
-  #if(not updateStopTimesThread30.isAlive()):
-  #  print("    Starting 30")
-  #  updateStopTimesThread30 = threading.Thread(target=updateStopTimes, args=(20,30))
-  #  updateStopTimesThread30.start()
-  #if(not updateStopTimesThread40.isAlive()):
-  #  print("    Starting 40")
-  #  updateStopTimesThread40 = threading.Thread(target=updateStopTimes, args=(30,50))
-  #  updateStopTimesThread40.start()
 
 db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
 conn = db.cursor()
