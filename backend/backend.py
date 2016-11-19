@@ -203,26 +203,38 @@ def updateStopTimes(bottom, top):
   except:
     return False
 
+def startStopTimesThreads():
+  if(not updateStopTimesThread.isAlive()):
+    print("    Starting stop times thread")
+    updateStopTimesThread = threading.Thread(target=updateStopTimes, args=(0,50))
+    updateStopTimesThread.start()
+  if(not updateStopTimesThread10.isAlive()):
+    print("    Starting 10")
+    UpdateStopTimesThread10 = threading.Thread(target=updateStopTimes, args=(0,10))
+    UpdateStopTimesThread10.start()
+  if(not updateStopTimesThread20.isAlive()):
+    print("    Starting 20")
+    UpdateStopTimesThread20 = threading.Thread(target=updateStopTimes, args=(10,20))
+    UpdateStopTimesThread20.start()
+  if(not updateStopTimesThread30.isAlive()):
+    print("    Starting 30")
+    UpdateStopTimesThread30 = threading.Thread(target=updateStopTimes, args=(20,30))
+    UpdateStopTimesThread30.start()
+  if(not updateStopTimesThread40.isAlive()):
+    print("    Starting 40")
+    UpdateStopTimesThread40 = threading.Thread(target=updateStopTimes, args=(30,50))
+    UpdateStopTimesThread40.start()
+
 db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
 conn = db.cursor()
 gtfs_sql = GTFS.GTFS(conn, db, ftp_url,"gtfs","gtfs.txt")
 updateStopsThread = threading.Thread(target=updateStops)
-updateStopTimesThread = threading.Thread(target=updateStopTimes, args=(0,50))
 #updateStopTimesThread10 = threading.Thread(target=updateStopTimes, args=(0,10))
 #updateStopTimesThread20 = threading.Thread(target=updateStopTimes, args=(10,20))
 #updateStopTimesThread30 = threading.Thread(target=updateStopTimes, args=(20,30))
 #updateStopTimesThread40 = threading.Thread(target=updateStopTimes, args=(30,50))
 
 #gtfs_sql.fullUpdate()
-#updateStopTimes(0,10)
-#updateStopTimes(10,20)
-#updateStopTimes(20,30)
-#updateStopTimes(30,50)
-#updateStopsThread.start()
-#updateStopTimesThread10.start()
-#updateStopTimesThread20.start()
-#updateStopTimesThread30.start()
-#updateStopTimesThread40.start()
 timer = getCurrentTime()
 while(True):
   if(getCurrentTime() - timer >= (1000*60*60*24*7)):
@@ -238,25 +250,6 @@ while(True):
       print("    Starting stops thread")
       updateStopsThread = threading.Thread(target=updateStops)
       updateStopsThread.start()
-      
-    #if(not updateStopTimesThread.isAlive()):
-    #  print("    Starting stop times thread")
-    #  updateStopTimesThread = threading.Thread(target=updateStopTimes, args=(0,50))
-    #  updateStopTimesThread.start()
-    #if(not updateStopTimesThread10.isAlive()):
-    #  print("    Starting 10")
-    #  UpdateStopTimesThread10 = threading.Thread(target=updateStopTimes, args=(0,10))
-    #  UpdateStopTimesThread10.start()
-    #if(not updateStopTimesThread20.isAlive()):
-    #  print("    Starting 20")
-    #  UpdateStopTimesThread20 = threading.Thread(target=updateStopTimes, args=(10,20))
-    #  UpdateStopTimesThread20.start()
-    #if(not updateStopTimesThread30.isAlive()):
-    #  print("    Starting 30")
-    #  UpdateStopTimesThread30 = threading.Thread(target=updateStopTimes, args=(20,30))
-    #  UpdateStopTimesThread30.start()
-    #if(not updateStopTimesThread40.isAlive()):
-    #  print("    Starting 40")
-    #  UpdateStopTimesThread40 = threading.Thread(target=updateStopTimes, args=(30,50))
-    #  UpdateStopTimesThread40.start()
+    startStopTimesThreads()
+    
     print("Loop took " + str((getCurrentTime()-timer)/1000) + " seconds")
