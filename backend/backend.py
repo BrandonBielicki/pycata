@@ -204,10 +204,6 @@ def updateStopTimes(bottom, top):
     return False
 
 def startStopTimesThreads():
-  if(not updateStopTimesThread.isAlive()):
-    print("    Starting stop times thread")
-    updateStopTimesThread = threading.Thread(target=updateStopTimes, args=(0,50))
-    updateStopTimesThread.start()
   if(not updateStopTimesThread10.isAlive()):
     print("    Starting 10")
     UpdateStopTimesThread10 = threading.Thread(target=updateStopTimes, args=(0,10))
@@ -229,10 +225,10 @@ db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
 conn = db.cursor()
 gtfs_sql = GTFS.GTFS(conn, db, ftp_url,"gtfs","gtfs.txt")
 updateStopsThread = threading.Thread(target=updateStops)
-#updateStopTimesThread10 = threading.Thread(target=updateStopTimes, args=(0,10))
-#updateStopTimesThread20 = threading.Thread(target=updateStopTimes, args=(10,20))
-#updateStopTimesThread30 = threading.Thread(target=updateStopTimes, args=(20,30))
-#updateStopTimesThread40 = threading.Thread(target=updateStopTimes, args=(30,50))
+updateStopTimesThread10 = threading.Thread(target=updateStopTimes, args=(0,10))
+updateStopTimesThread20 = threading.Thread(target=updateStopTimes, args=(10,20))
+updateStopTimesThread30 = threading.Thread(target=updateStopTimes, args=(20,30))
+updateStopTimesThread40 = threading.Thread(target=updateStopTimes, args=(30,50))
 
 #gtfs_sql.fullUpdate()
 timer = getCurrentTime()
@@ -246,10 +242,10 @@ while(True):
     timer = getCurrentTime()
     updateTimeStamp()
     updateTrips()
-    if(not updateStopsThread.isAlive()):
-      print("    Starting stops thread")
-      updateStopsThread = threading.Thread(target=updateStops)
-      updateStopsThread.start()
+    #if(not updateStopsThread.isAlive()):
+    #  print("    Starting stops thread")
+    #  updateStopsThread = threading.Thread(target=updateStops)
+    #  updateStopsThread.start()
     startStopTimesThreads()
     
     print("Loop took " + str((getCurrentTime()-timer)/1000) + " seconds")
