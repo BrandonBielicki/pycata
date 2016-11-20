@@ -119,6 +119,8 @@ def deleteStops():
     return False
 
 def updateStops():
+  stops_db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
+  stops_conn = stops_db.cursor()
   try:
     feed = gtfs_realtime_pb2.FeedMessage()
     feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
@@ -150,8 +152,8 @@ def updateStops():
           try:
             _lat=0
             _long=0
-            conn.execute("SELECT id, code, latitude, longitude FROM stops WHERE code='"+ item +"'")
-            row = conn.fetchone()
+            stops_conn.execute("SELECT id, code, latitude, longitude FROM stops WHERE code='"+ item +"'")
+            row = stops_conn.fetchone()
             if row is not None:
               _id = row[0]
               _code = row[1]
@@ -168,6 +170,7 @@ def updateStops():
     return False
 
 def updateStopTimes(bottom, top):
+  
   def getTripsFromRoute(feed, route):
     trips=[]
     for entity in feed.entity:
@@ -180,6 +183,8 @@ def updateStopTimes(bottom, top):
     return trips
      
   try:
+    time_db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
+    time_conn = time_db.cursor()
     feed = gtfs_realtime_pb2.FeedMessage()
     feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
     json_data = json.loads(firebaseCall(fb_stop_url,"get","").content)
@@ -195,12 +200,13 @@ def updateStopTimes(bottom, top):
                 _stop_code = key
                 stop_id = str(value['id'])
                 sql_stmt="select arrival from trips t, stop_times s where service_id=(select service_id from trips where trip_id="+trip_id+") and t.trip_id=s.trip_id and t.route_id="+_route_num+" and s.stop_id="+stop_id+" and arrival>='"+cur_time+"' order by arrival limit 3"
-                conn.execute(sql_stmt)
+                time_conn.execute(sql_stmt)
                 time="0"
                 try:
-                  time=conn.fetchone()[0]
+                  time=time_conn.fetchone()[0]
+                  time = datetime.datetime.strptime(str(time), "%H:%M:%S").strftime("%I:%M")
                 except:
-                  x=1
+                  pass
                 update_str="{ "
                 update_str += "\"1\" : \""+str(time)+"\"}"
                 firebaseCall(fb_base_url+"/stops/"+str(_route_num)+"/"+str(_stop_code)+".json?auth="+auth_key,"patch",update_str) 
@@ -247,6 +253,7 @@ updateStopTimesThread30 = Process(target=updateStopTimes, args=(20,30))
 updateStopTimesThread40 = Process(target=updateStopTimes, args=(30,50))
 
 #gtfs_sql.fullUpdate()
+#deleteStops()
 timer = getCurrentTime()
 while(True):
   if(getCurrentTime() - timer >= (1000*60*60*24*7)):
