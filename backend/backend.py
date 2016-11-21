@@ -170,7 +170,6 @@ def updateStops():
     return False
 
 def updateStopTimes(bottom, top):
-  
   def getTripsFromRoute(feed, route):
     trips=[]
     for entity in feed.entity:
@@ -201,14 +200,19 @@ def updateStopTimes(bottom, top):
                 stop_id = str(value['id'])
                 sql_stmt="select arrival from trips t, stop_times s where service_id=(select service_id from trips where trip_id="+trip_id+") and t.trip_id=s.trip_id and t.route_id="+_route_num+" and s.stop_id="+stop_id+" and arrival>='"+cur_time+"' order by arrival limit 3"
                 time_conn.execute(sql_stmt)
-                time="0"
+                time1="No Time Available"
+                time2="No Time Available"
+                time3="No Time Available"
                 try:
-                  time=time_conn.fetchone()[0]
-                  time = datetime.datetime.strptime(str(time), "%H:%M:%S").strftime("%I:%M")
+                  time = time_conn.fetchone()[0]
+                  time1 = datetime.datetime.strptime(str(time), "%H:%M:%S").strftime("%I:%M")
+                  time = time_conn.fetchone()[0]
+                  time2 = datetime.datetime.strptime(str(time), "%H:%M:%S").strftime("%I:%M")
+                  time = time_conn.fetchone()[0]
+                  time3 = datetime.datetime.strptime(str(time), "%H:%M:%S").strftime("%I:%M")
                 except:
                   pass
-                update_str="{ "
-                update_str += "\"1\" : \""+str(time)+"\"}"
+                update_str = "{ \"1\" : \""+str(time1)+"\",\"2\" : \""+str(time2)+"\",\"3\" : \""+str(time3)+"\"}"
                 firebaseCall(fb_base_url+"/stops/"+str(_route_num)+"/"+str(_stop_code)+".json?auth="+auth_key,"patch",update_str) 
     return True
   except:
