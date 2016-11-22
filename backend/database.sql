@@ -1,3 +1,9 @@
+drop table shapes;
+drop table routes;
+drop table trips;
+drop table stops;
+drop table stop_times;
+
 CREATE TABLE shapes(
     id int NOT NULL,
     latitude decimal(10,8),

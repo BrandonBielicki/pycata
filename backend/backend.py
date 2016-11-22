@@ -1,7 +1,7 @@
-#import gtfs_realtime_pb2
 from google.transit import gtfs_realtime_pb2
 import urllib2
 import auth
+import GTFS
 import requests
 import os
 import glob
@@ -9,6 +9,9 @@ import zipfile
 import MySQLdb
 import time
 import warnings
+import json
+from multiprocessing import Process
+import datetime
 warnings.filterwarnings('ignore', category=MySQLdb.Warning)
 
 auth_key=auth.auth_key
@@ -21,24 +24,14 @@ fb_timestamp_url=auth.fb_timestamp_url
 fb_vehicle_url=auth.fb_vehicle_url
 fb_trip_url=auth.fb_trip_url
 fb_stop_url=auth.fb_stop_url
+fb_base_url=auth.fb_base_url
 feed_url=auth.feed_url
 trip_feed_url=auth.trip_feed_url
 vehicle_feed_url=auth.vehicle_feed_url
 
-db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
-conn = db.cursor()
-
 def getCurrentTime():
   return int(round(time.time()*1000))
           
-def clearSqlGtfs(conn):
-  conn.execute('delete from trips;')
-  conn.execute('delete from routes;')
-  conn.execute('delete from shapes;')
-  conn.execute('delete from stops;')
-  conn.execute('delete from stop_times;')
-  db.commit()
-
 def sync():
   feed = gtfs_realtime_pb2.FeedMessage()
   feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
@@ -48,44 +41,13 @@ def sync():
   while(timestamp1 == timestamp2):
     feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
     timestamp2 = feed.header.timestamp
-
-def loadFile(conn, name, table, col_str):
-  conn.execute('LOAD DATA LOCAL INFILE "/root/dev/pycata/backend/gtfs/'+name+'"INTO TABLE '+table+' FIELDS TERMINATED BY "," IGNORE 1 LINES '+col_str)
-  db.commit()
-  
-def uploadGtfs(conn):
-  loadFile(conn,"shapes.txt","shapes","")
-  loadFile(conn,"trips.txt","trips","(route_id,service_id,trip_id,head_sign,@col5,direction,block_id,shape_id,@col9,@col10)")
-  loadFile(conn,"stops.txt","stops","(id,code,name,description,latitude,longitude)")
-  loadFile(conn,"routes.txt","routes","(id,@col2,@col3,name,@col5,@col6,@col7,color,@col9)")
-  loadFile(conn,"stop_times.txt","stop_times","(trip_id,arrival,departure,stop_id,stop_sequence,@col6,@col7,@col8,@col9)")
-     
-def extractZip(in_path, out_path):
-  zip_file = zipfile.ZipFile(in_path, 'r')
-  zip_file.extractall(out_path)
-  zip_file.close()
-  
-def delFromDir(path):
-  filelist = glob.glob(path)
-  for f in filelist:
-      os.remove(f)
-  
-def getGtfs(url, directory, filename):
-  if not os.path.exists(directory):
-    os.makedirs(directory)
-  delFromDir(directory + "/*")
-  response = urllib2.urlopen(url)
-  zipcontent = response.read()
-  with open(directory+"/"+filename, 'w') as f:
-      f.write(zipcontent)
-  extractZip(directory+"/"+filename, directory)
-
+           
 def firebaseCall(_url, _method, _data):
   try:
     if(_method == "post"):
       response = requests.post(_url, _data)
     elif(_method == "get"):
-      response = requests.get(_url, _data)
+      response = requests.get(_url)
     elif(_method == "put"):
       response = requests.put(_url, _data)
     elif(_method == "delete"):
@@ -94,7 +56,7 @@ def firebaseCall(_url, _method, _data):
       response = requests.patch(_url, _data)
     content = response.content
     code = response.status_code
-    return True
+    return response
   except:
     return False
   
@@ -126,6 +88,8 @@ def updateTrips():
     for entity in feed.entity:
       _id=entity.id
       _route_id=entity.trip_update.trip.route_id
+      if(str(_route_id) == "261"):
+        _route_id ="26"
       _vehicle_id=entity.trip_update.vehicle.id
       _lat = buses[_vehicle_id][0]
       _long = buses[_vehicle_id][1]
@@ -155,10 +119,24 @@ def deleteStops():
     return False
 
 def updateStops():
+  stops_db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
+  stops_conn = stops_db.cursor()
   try:
     feed = gtfs_realtime_pb2.FeedMessage()
     feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
     stops={}
+    
+    ################## QUESTIONABLE ##################
+    json_data = json.loads(firebaseCall(fb_stop_url,"get","").content)
+    if(json_data is not None):
+      for key, value in json_data.iteritems():
+        _route_num = key
+        if(_route_num not in stops):
+          stops[_route_num]=[]
+        for key, value in value.iteritems():
+          stops[_route_num].append(str(key))
+    ################## QUESTIONABLE ##################
+    
     for entity in feed.entity:
       _route_id=entity.trip_update.trip.route_id
       if(_route_id not in stops):
@@ -167,48 +145,129 @@ def updateStops():
         stop_id = stop.stop_id
         stops[_route_id].append(str(stop_id))
     
-      stop_str = "{ "
       for key, value in stops.iteritems():
         stop_names = set(value)
-        stop_str += "\"" + key + "\" : { "
+        _route_id = key
         for item in stop_names:
-          _lat=0
-          _long=0
-          conn.execute("SELECT latitude, longitude FROM stops WHERE code='"+ item +"'")
-          row = conn.fetchone()
-          if row is not None:
-            _lat=row[0]
-            _long=row[1]
-          stop_str += "\""+ item +"\": { \"latitude\": \""+str(_lat)+"\", \"longitude\": \""+str(_long)+"\"}, "
-        stop_str += "},"
-      
-    stop_str += " }" 
-    stop_str = stop_str.replace(", }"," }")
-    stop_str = stop_str.replace(",  }"," }")
-    firebaseCall(fb_stop_url,"patch",stop_str)
+          try:
+            _lat=0
+            _long=0
+            stops_conn.execute("SELECT id, code, latitude, longitude FROM stops WHERE code='"+ item +"'")
+            row = stops_conn.fetchone()
+            if row is not None:
+              _id = row[0]
+              _code = row[1]
+              _lat=row[2]
+              _long=row[3]
+              test ="{ \"id\": \""+str(_id)+"\", \"code\": \""+str(_code)+"\", \"latitude\": \""+str(_lat)+"\", \"longitude\": \""+str(_long)+"\"}"
+              firebaseCall(fb_base_url+"/stops/"+str(_route_id)+"/"+item+".json?auth="+auth_key,"patch",test)
+          except:
+            #print("    Error in " + item + " route " + _route_id )
+            x=1
     return True
   except:
+    print("    Error in updateStops")
     return False
 
-#clearSqlGtfs(conn)
-#getGtfs(ftp_url,"gtfs","gtfs.txt")
-#uploadGtfs(conn)
-deleteTrips()
-updateTrips()
-updateStops()
-sync()
+def updateStopTimes(bottom, top):
+  def getTripsFromRoute(feed, route):
+    trips=[]
+    for entity in feed.entity:
+      _trip_id=entity.id
+      _route_id=entity.trip_update.trip.route_id
+      if(str(_route_id) == "261"):
+        _route_id ="26"
+      if(_route_id == route):
+        trips.append(_trip_id)
+    return trips
+     
+  try:
+    time_db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
+    time_conn = time_db.cursor()
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
+    json_data = json.loads(firebaseCall(fb_stop_url,"get","").content)
+    if(json_data is not None):
+      for key, value in json_data.iteritems():
+        if(int(key) > bottom and int(key) <= top):
+          _route_num = key
+          trips = getTripsFromRoute(feed,_route_num)
+          cur_time = str(datetime.datetime.strftime(datetime.datetime.now(), '%H:%M:%S'))
+          if(len(trips) > 0):
+            trip_id=str(trips[0])
+            for key, value in value.iteritems():
+                _stop_code = key
+                stop_id = str(value['id'])
+                sql_stmt="select arrival from trips t, stop_times s where service_id=(select service_id from trips where trip_id="+trip_id+") and t.trip_id=s.trip_id and t.route_id="+_route_num+" and s.stop_id="+stop_id+" and arrival>='"+cur_time+"' order by arrival limit 3"
+                time_conn.execute(sql_stmt)
+                time1="No Time Available"
+                time2="No Time Available"
+                time3="No Time Available"
+                try:
+                  time = time_conn.fetchone()[0]
+                  time1 = datetime.datetime.strptime(str(time), "%H:%M:%S").strftime("%I:%M")
+                  time = time_conn.fetchone()[0]
+                  time2 = datetime.datetime.strptime(str(time), "%H:%M:%S").strftime("%I:%M")
+                  time = time_conn.fetchone()[0]
+                  time3 = datetime.datetime.strptime(str(time), "%H:%M:%S").strftime("%I:%M")
+                except:
+                  pass
+                update_str = "{ \"1\" : \""+str(time1)+"\",\"2\" : \""+str(time2)+"\",\"3\" : \""+str(time3)+"\"}"
+                firebaseCall(fb_base_url+"/stops/"+str(_route_num)+"/"+str(_stop_code)+".json?auth="+auth_key,"patch",update_str) 
+    return True
+  except:
+    print("Error in updateStopTimes")
+    return False
+
+def startThreads():
+  global updateStopTimesThread10
+  global updateStopTimesThread20
+  global updateStopTimesThread30
+  global updateStopTimesThread40
+  global updateStopsThread
+  
+  if(not updateStopTimesThread10.is_alive()):
+    print("    Starting 10")
+    updateStopTimesThread10 = Process(target=updateStopTimes, args=(0,10))
+    updateStopTimesThread10.start()
+  if(not updateStopTimesThread20.is_alive()):
+    print("    Starting 20")
+    updateStopTimesThread20 = Process(target=updateStopTimes, args=(10,20))
+    updateStopTimesThread20.start()
+  if(not updateStopTimesThread30.is_alive()):
+    print("    Starting 30")
+    updateStopTimesThread30 = Process(target=updateStopTimes, args=(20,30))
+    updateStopTimesThread30.start()
+  if(not updateStopTimesThread40.is_alive()):
+    print("    Starting 40")
+    updateStopTimesThread40 = Process(target=updateStopTimes, args=(30,50))
+    updateStopTimesThread40.start()
+  if(not updateStopsThread.is_alive()):
+    print("    Starting stops thread")
+    updateStopsThread = Process(target=updateStops)
+    updateStopsThread.start()
+
+db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
+conn = db.cursor()
+gtfs_sql = GTFS.GTFS(conn, db, ftp_url,"gtfs","gtfs.txt")
+updateStopsThread = Process(target=updateStops)
+updateStopTimesThread10 = Process(target=updateStopTimes, args=(0,10))
+updateStopTimesThread20 = Process(target=updateStopTimes, args=(10,20))
+updateStopTimesThread30 = Process(target=updateStopTimes, args=(20,30))
+updateStopTimesThread40 = Process(target=updateStopTimes, args=(30,50))
+
+#gtfs_sql.fullUpdate()
+#deleteStops()
 timer = getCurrentTime()
 while(True):
   if(getCurrentTime() - timer >= (1000*60*60*24*7)):
-    clearSqlGtfs(conn)
-    getGtfs(ftp_url,"gtfs","gtfs.txt")
-    uploadGtfs()
+    gtfs_sql.fullUpdate()
     deleteStops()
-    sync()
     timer = getCurrentTime()
-  if(getCurrentTime() - timer >= (1000*30)):  
+  if(getCurrentTime() - timer >= (1000*5)):
+    print("Starting main loop")
     timer = getCurrentTime()
     updateTimeStamp()
-    deleteTrips()
     updateTrips()
-    updateStops()
+    startThreads()
+    print("Loop took " + str((getCurrentTime()-timer)/1000) + " seconds")
