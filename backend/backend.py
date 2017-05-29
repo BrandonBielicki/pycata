@@ -129,17 +129,14 @@ def deleteStops():
     return False
 
 def getRouteStops(route, gtfs):
-    stops = gtfs.executeQuery("""SELECT DISTINCT id 
+    stops = gtfs.executeQuery("""SELECT DISTINCT id, code, name, latitude, longitude
     FROM stops S
     INNER JOIN stop_times T
         ON T.stop_id = S.id
     INNER JOIN trips Tr
         ON Tr.trip_id = T.trip_id
     WHERE Tr.route_id = %s""", (route,))
-    stops_list = []
-    for x in stops:
-        stops_list.append(str(x[0]))
-    return stops_list
+    return stops
 
 #unused
 def updateStops():
