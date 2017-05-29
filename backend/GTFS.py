@@ -16,6 +16,10 @@ class GTFS:
         self.filename = filename
         self.conn = conn
         self.db = db
+     
+    def executeQuery(self, query, params=()):
+        self.conn.execute(query, params)
+        return self.conn.fetchall()
         
     def fullUpdate(self):
         self.clearSqlGtfs()
@@ -51,7 +55,7 @@ class GTFS:
         zip_file.close()
         
     def loadFile(self,conn, name, table, col_str):
-        conn.execute('LOAD DATA LOCAL INFILE "/root/dev/pycata/backend/gtfs/'+name+'"INTO TABLE '+table+' FIELDS TERMINATED BY "," IGNORE 1 LINES '+col_str)
+        conn.execute('LOAD DATA LOCAL INFILE "/root/dev/spartaride_backend/backend/gtfs/'+name+'"INTO TABLE '+table+' FIELDS TERMINATED BY "," IGNORE 1 LINES '+col_str)
         self.db.commit()
         
     def uploadGtfs(self):

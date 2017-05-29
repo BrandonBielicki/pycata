@@ -2,3 +2,4 @@ auth.*
 *.zip
 *.txt
 *.pyc
+sandbox.py
