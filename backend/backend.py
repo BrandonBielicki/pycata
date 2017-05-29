@@ -115,7 +115,6 @@ def updateTrips():
         stop_item = {"delay":str(delay),"arrival":str(arrival),"departure":str(departure),"stop_id":str(stop_id)}
         data[str(trip_id)]["stops"][str(stop_seq)] = stop_item
      
-    print(json.dumps(data))  
     firebaseCall(fb_trip_url,"put",json.dumps(data))
     return True
   except Exception, e:
@@ -128,6 +127,19 @@ def deleteStops():
     return True
   except:
     return False
+
+def getRouteStops(route, gtfs):
+    stops = gtfs.executeQuery("""SELECT DISTINCT id 
+    FROM stops S
+    INNER JOIN stop_times T
+        ON T.stop_id = S.id
+    INNER JOIN trips Tr
+        ON Tr.trip_id = T.trip_id
+    WHERE Tr.route_id = %s""", (route,))
+    stops_list = []
+    for x in stops:
+        stops_list.append(str(x[0]))
+    return stops_list
 
 #unused
 def updateStops():
