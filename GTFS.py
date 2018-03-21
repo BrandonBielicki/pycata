@@ -5,12 +5,9 @@ import glob
 import zipfile
 import MySQLdb
 import warnings
-
 warnings.filterwarnings('ignore', category=MySQLdb.Warning)
 
 class GTFS:
-    
-    
     
     def __init__(self, auth, directory, filename):
         self.ftp_url = auth.ftp_url
