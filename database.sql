@@ -14,37 +14,38 @@ CREATE TABLE shapes(
 );
 
 CREATE TABLE routes(
-    id int NOT NULL,
-    name varchar(64),
-    color varchar(8),
-    PRIMARY KEY(id)
+    route_long_name varchar(64),
+    route_color varchar(8),
+    route_id int NOT NULL,
+    PRIMARY KEY(route_id)
 );
 
 CREATE TABLE trips(
-    route_id int NOT NULL,
-    service_id int,
-    trip_id int NOT NULL,
-    head_sign varchar(64),
-    direction int,
-    block_id int,
-    shape_id int,
-    PRIMARY KEY(route_id,trip_id)
+   
+   block_id varchar(16),
+   route_id int NOT NULL,
+   direction_id int,
+   trip_headsign varchar(64),
+   shape_id int,
+   service_id varchar(32),
+   trip_id int NOT NULL,
+   PRIMARY KEY(route_id,trip_id)
 );
 
 CREATE TABLE stops(
-   id int NOT NULL,
-   code varchar(32),
-   name varchar(32),
-   description varchar(64),
-   latitude decimal(10,8),
-   longitude decimal(11,8),
-   PRIMARY KEY(id)
+   stop_lat decimal(10,8),
+   stop_code int,
+   stop_lon decimal(11,8),
+   stop_desc varchar(32),
+   stop_name varchar(32),
+   stop_id int NOT NULL,  
+   PRIMARY KEY(stop_id)
 );
 
 CREATE TABLE stop_times(
     trip_id int NOT NULL,
-    arrival time,
-    departure time,
+    arrival_time time,
+    departure_time time,
     stop_id int NOT NULL,
     stop_sequence int,
     PRIMARY KEY(trip_id,stop_id,stop_sequence)

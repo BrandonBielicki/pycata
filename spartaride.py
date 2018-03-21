@@ -16,10 +16,6 @@ warnings.filterwarnings('ignore', category=MySQLdb.Warning)
 
 auth_key=auth.auth_key
 ftp_url=auth.ftp_url
-db_host=auth.db_host
-db_user=auth.db_user
-db_pass=auth.db_pass
-db_db=auth.db_db
 fb_timestamp_url=auth.fb_timestamp_url
 fb_vehicle_url=auth.fb_vehicle_url
 fb_trip_url=auth.fb_trip_url
@@ -28,6 +24,33 @@ fb_base_url=auth.fb_base_url
 feed_url=auth.feed_url
 trip_feed_url=auth.trip_feed_url
 vehicle_feed_url=auth.vehicle_feed_url
+route_number_dict = {
+  "8540":"01",
+  "8541":"02",
+  "8542":"03",
+  "8544":"05",
+  "8546":"07",
+  "8547":"08",
+  "8548":"09",
+  "8549":"10",
+  "8550":"11",
+  "8551":"12",
+  "8552":"13",
+  "8553":"14",
+  "8554":"15",
+  "8555":"16",
+  "8556":"20",
+  "8557":"22",
+  "8558":"23",
+  "8559":"24",
+  "8560":"25",
+  "8561":"26",
+  "8563":"30",
+  "8564":"31",
+  "8565":"32",
+  "8566":"33",
+  "8570":"39"
+}
 
 def getCurrentTime():
   return int(round(time.time()*1000))
@@ -40,11 +63,14 @@ def waitForUpdate(in_time = None):
   else:
     timestamp1 = in_time
   timestamp2 = feed.header.timestamp
-  print("syncing")
+  #print("waiting for next update...")
   while(timestamp1 == timestamp2):
-    feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
-    timestamp2 = feed.header.timestamp
-  print("update detected. Continuing")
+    try:
+      feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
+      timestamp2 = feed.header.timestamp
+    except Exception, e:
+      print("ERROR retrieving feed timestamp: " + str(e))
+  #print("update detected. Continuing")
   return(timestamp2)
            
 def firebaseCall(_url, _method, _data):
@@ -96,9 +122,11 @@ def updateTrips():
     data = {}
     for entity in trip_feed.entity:
       trip_id=entity.id
-      route_number=entity.trip_update.trip.route_id
-      if(str(route_number) == "261"):
-        route_number ="26"
+      try:
+        route_number=route_number_dict[entity.trip_update.trip.route_id]
+      except Exception, e:
+        print("route_number not in route_number_dict: " + str(e))
+        route_number=entity.trip_update.trip.route_id
       bus_id=entity.trip_update.vehicle.id
       latitude = buses[bus_id][0]
       longitude = buses[bus_id][1]
@@ -152,16 +180,15 @@ def getRoutes(gtfs):
   """)
   return routes
 
-#db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_db)
-#conn = db.cursor()
-#gtfs_sql = GTFS.GTFS(conn, db, ftp_url,"gtfs","gtfs.txt")
-
-#gtfs_sql.fullUpdate()
+gtfs_sql = GTFS.GTFS(auth,"gtfs","gtfs.txt")
+gtfs_sql.fullUpdate()
 timer = getCurrentTime()
 feed_timestamp = waitForUpdate()
+print("Starting main loop")
 while(True):
   if(getCurrentTime() - timer >= (1000*60*60*24*7)):
-    #gtfs_sql.fullUpdate()
+    print("GTFS timer complete, starting full gtfs update")
+    gtfs_sql.fullUpdate()
     #deleteStops()
     timer = getCurrentTime()
     
