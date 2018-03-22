@@ -20,6 +20,7 @@ fb_timestamp_url=auth.fb_timestamp_url
 fb_vehicle_url=auth.fb_vehicle_url
 fb_trip_url=auth.fb_trip_url
 fb_stop_url=auth.fb_stop_url
+fb_bus_url=auth.fb_bus_url
 fb_base_url=auth.fb_base_url
 feed_url=auth.feed_url
 trip_feed_url=auth.trip_feed_url
@@ -154,6 +155,39 @@ def updateTrips():
     print("updateTrips - Error: " + str(e))
     return False
 
+def updateBuses():
+  try:
+    vehicle_feed = gtfs_realtime_pb2.FeedMessage()
+    vehicle_feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
+    buses={}
+    for entity in vehicle_feed.entity:
+      buses[entity.id] = [entity.vehicle.position.latitude, entity.vehicle.position.longitude, entity.vehicle.position.bearing]
+    trip_feed = gtfs_realtime_pb2.FeedMessage()
+    trip_feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
+    data = {}
+    for entity in trip_feed.entity:
+      trip_id=entity.id
+      try:
+        route_number=route_number_dict[entity.trip_update.trip.route_id]
+      except Exception, e:
+        print("route_number not in route_number_dict: " + str(e))
+        route_number=entity.trip_update.trip.route_id
+      bus_id=entity.trip_update.vehicle.id
+      latitude = buses[bus_id][0]
+      longitude = buses[bus_id][1]
+      try:
+        bearing = buses[bus_id][2]
+      except:
+        bearing = "None"
+      route = {"route":str(route_number),"bus":str(bus_id),"latitude":str(latitude),"longitude":str(longitude),"bearing":str(bearing),"stops":{}}
+      data[str(trip_id)] = route
+     
+    firebaseCall(fb_bus_url,"put",json.dumps(data))
+    return True
+  except Exception, e:
+    print("updateBuses - Error: " + str(e))
+    return False
+
 def deleteStops():
   try:
     firebaseCall(fb_stop_url,"delete","")
@@ -183,7 +217,7 @@ def getRoutes(gtfs):
   return routes
 
 gtfs_sql = GTFS.GTFS(auth,"gtfs","gtfs.txt")
-gtfs_sql.fullUpdate()
+#gtfs_sql.fullUpdate()
 timer = getCurrentTime()
 feed_timestamp = waitForUpdate()
 print("Starting main loop")
@@ -196,4 +230,5 @@ while(True):
     
   feed_timestamp = waitForUpdate(feed_timestamp) 
   updateTimeStamp()
+  updateBuses()
   updateTrips()
