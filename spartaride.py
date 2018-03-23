@@ -29,7 +29,9 @@ route_number_dict = {
   "8540":"01",
   "8541":"02",
   "8542":"03",
+  "8543":"04",
   "8544":"05",
+  "8545":"06",
   "8546":"07",
   "8547":"08",
   "8548":"09",
@@ -46,6 +48,7 @@ route_number_dict = {
   "8559":"24",
   "8560":"25",
   "8561":"26",
+  "8562":"261",
   "8563":"30",
   "8564":"31",
   "8565":"32",
@@ -188,14 +191,6 @@ def updateBuses():
     print("updateBuses - Error: " + str(e))
     return False
 
-def deleteStops():
-  try:
-    firebaseCall(fb_stop_url,"delete","")
-    return True
-  except Exception, e:
-    print("deleteStops - Error: " + str(e))
-    return False
-
 def getRouteStops(route, gtfs):
   try:
     stops = gtfs.executeQuery("""SELECT DISTINCT id, code, name, latitude, longitude
@@ -216,16 +211,27 @@ def getRoutes(gtfs):
   """)
   return routes
 
+def updateStops(gtfs_sql):
+  route_id_list = gtfs_sql.getRouteIds()
+  stops_string = "{"
+  for route_id in route_id_list:
+    route_stops = gtfs_sql.getStopsForRoute(route_id)
+    stops_string += json.dumps(route_stops)[1:-1] + ","
+  stops_string = stops_string[:-1]
+  stops_string += "}"
+  firebaseCall(fb_stop_url,"put",stops_string)
+  
 gtfs_sql = GTFS.GTFS(auth,"gtfs","gtfs.txt")
 #gtfs_sql.fullUpdate()
+#updateStops(gtfs_sql)
 timer = getCurrentTime()
 feed_timestamp = waitForUpdate()
 print("Starting main loop")
 while(True):
   if(getCurrentTime() - timer >= (1000*60*60*24*7)):
     print("GTFS timer complete, starting full gtfs update")
+    updateStops(gtfs_sql)
     gtfs_sql.fullUpdate()
-    #deleteStops()
     timer = getCurrentTime()
     
   feed_timestamp = waitForUpdate(feed_timestamp) 

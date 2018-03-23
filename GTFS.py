@@ -41,6 +41,28 @@ class GTFS:
         self.conn.execute(query, params)
         return self.conn.fetchall()
         
+    def getRouteIds(self):
+        sql_query = "SELECT DISTINCT ROUTE_ID FROM routes;"
+        self.conn.execute(sql_query)
+        route_id_list = []
+        for row in self.conn:
+            route_id_list.append(str(row[0]))
+        return route_id_list
+    
+    def getStopsForRoute(self,route_id):
+        sql_query = """
+        SELECT DISTINCT S.stop_id,S.stop_lat,S.stop_lon,S.stop_desc,S.stop_name
+        FROM stops S INNER JOIN stop_times T ON S.stop_id=T.stop_id
+        WHERE trip_id=(SELECT trip_id FROM trips WHERE route_id=%s AND direction_id=0 LIMIT 1) OR trip_id=(SELECT trip_id FROM trips WHERE route_id=%s AND direction_id=1 LIMIT 1);
+        """
+        self.conn.execute(sql_query,(route_id,route_id))
+        stops={}
+        stops["%02d" % (int(route_id),)]={}
+        for row in self.conn:
+            stop = {"id":str(row[0]),"latitude":str(row[1]),"longitude":str(row[2]),"description":row[3],"name":row[4]}
+            stops["%02d" % (int(route_id),)][row[0]]=stop
+        return stops
+    
     def fullUpdate(self):
         self.clearSqlGtfs()
         self.getGtfs()
