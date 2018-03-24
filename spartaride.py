@@ -53,6 +53,9 @@ route_number_dict = {
   "8564":"31",
   "8565":"32",
   "8566":"33",
+  "8567":"34",
+  "8568":"35",
+  "8569":"36",
   "8570":"39",
   "8571":"46",
   "8572":"48"
@@ -204,6 +207,7 @@ def updateBuses():
         buses[bus_route_number][bus_id]={"bus":str(bus_id),"latitude":str(bus_latitude),"longitude":str(bus_longitude),"route":str(bus_route_number),"bearing":str(bus_bearing)}
       else:
         buses[bus_route_number] = {}
+        buses[bus_route_number][bus_id]={"bus":str(bus_id),"latitude":str(bus_latitude),"longitude":str(bus_longitude),"route":str(bus_route_number),"bearing":str(bus_bearing)}
     firebaseCall(fb_bus_url,"put",json.dumps(buses))
     return True
   except Exception, e:
