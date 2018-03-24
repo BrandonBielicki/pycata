@@ -54,5 +54,5 @@ def getVehicles():
   vehicle_feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
   return vehicle_feed
 
-#print(getTrips())
-print(getVehicles())
+print(getTrips())
+#print(getVehicles())
