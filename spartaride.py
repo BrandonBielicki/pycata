@@ -158,39 +158,6 @@ def updateTrips():
     print("updateTrips - Error: " + str(e))
     return False
 
-def updateBuses():
-  try:
-    vehicle_feed = gtfs_realtime_pb2.FeedMessage()
-    vehicle_feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
-    buses={}
-    for entity in vehicle_feed.entity:
-      buses[entity.id] = [entity.vehicle.position.latitude, entity.vehicle.position.longitude, entity.vehicle.position.bearing]
-    trip_feed = gtfs_realtime_pb2.FeedMessage()
-    trip_feed.ParseFromString(urllib2.urlopen(trip_feed_url).read())
-    data = {}
-    for entity in trip_feed.entity:
-      trip_id=entity.id
-      try:
-        route_number=route_number_dict[entity.trip_update.trip.route_id]
-      except Exception, e:
-        print("route_number not in route_number_dict: " + str(e))
-        route_number=entity.trip_update.trip.route_id
-      bus_id=entity.trip_update.vehicle.id
-      latitude = buses[bus_id][0]
-      longitude = buses[bus_id][1]
-      try:
-        bearing = buses[bus_id][2]
-      except:
-        bearing = "None"
-      route = {"route":str(route_number),"bus":str(bus_id),"latitude":str(latitude),"longitude":str(longitude),"bearing":str(bearing),"stops":{}}
-      data[str(trip_id)] = route
-     
-    firebaseCall(fb_bus_url,"put",json.dumps(data))
-    return True
-  except Exception, e:
-    print("updateBuses - Error: " + str(e))
-    return False
-
 def getRouteStops(route, gtfs):
   try:
     stops = gtfs.executeQuery("""SELECT DISTINCT id, code, name, latitude, longitude
@@ -221,6 +188,28 @@ def updateStops(gtfs_sql):
   stops_string += "}"
   firebaseCall(fb_stop_url,"put",stops_string)
   
+def updateBuses():
+  try:
+    vehicle_feed = gtfs_realtime_pb2.FeedMessage()
+    vehicle_feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
+    buses={}
+    for entity in vehicle_feed.entity:
+      bus_id = entity.id
+      bus_latitude = entity.vehicle.position.latitude
+      bus_longitude = entity.vehicle.position.longitude
+      bus_bearing = entity.vehicle.position.bearing
+      bus_route_number = route_number_dict[entity.vehicle.trip.route_id]
+      bus_trip_id = entity.vehicle.trip.trip_id
+      if(buses.has_key(bus_route_number)):
+        buses[bus_route_number][bus_id]={"bus":str(bus_id),"latitude":str(bus_latitude),"longitude":str(bus_longitude),"route":str(bus_route_number),"bearing":str(bus_bearing)}
+      else:
+        buses[bus_route_number] = {}
+    firebaseCall(fb_bus_url,"put",json.dumps(buses))
+    return True
+  except Exception, e:
+    print("updateTrips - Error: " + str(e))
+    return False
+
 gtfs_sql = GTFS.GTFS(auth,"gtfs","gtfs.txt")
 #gtfs_sql.fullUpdate()
 #updateStops(gtfs_sql)
