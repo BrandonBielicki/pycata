@@ -41,27 +41,42 @@ class GTFS:
         self.conn.execute(query, params)
         return self.conn.fetchall()
         
+    def getRouteNumberFromTripId(self, trip_id):
+        try:
+            sql_query = "SELECT route_id FROM trips where trip_id=%s"
+            self.conn.execute(sql_query,[trip_id])
+            for row in self.conn:
+                return row[0]
+        except Exception, e:
+            print("SQL ERROR: " + str(e))
+    
     def getRouteIds(self):
-        sql_query = "SELECT DISTINCT ROUTE_ID FROM routes;"
-        self.conn.execute(sql_query)
-        route_id_list = []
-        for row in self.conn:
-            route_id_list.append(str(row[0]))
-        return route_id_list
+        try:
+            sql_query = "SELECT DISTINCT ROUTE_ID FROM routes;"
+            self.conn.execute(sql_query)
+            route_id_list = []
+            for row in self.conn:
+                route_id_list.append(str(row[0]))
+            return route_id_list
+        except Exception, e:
+            print("SQL ERROR: " + str(e))
     
     def getStopsForRoute(self,route_id):
-        sql_query = """
-        SELECT DISTINCT S.stop_id,S.stop_lat,S.stop_lon,S.stop_desc,S.stop_name
-        FROM stops S INNER JOIN stop_times T ON S.stop_id=T.stop_id
-        WHERE trip_id=(SELECT trip_id FROM trips WHERE route_id=%s AND direction_id=0 LIMIT 1) OR trip_id=(SELECT trip_id FROM trips WHERE route_id=%s AND direction_id=1 LIMIT 1);
-        """
-        self.conn.execute(sql_query,(route_id,route_id))
-        stops={}
-        stops["%02d" % (int(route_id),)]={}
-        for row in self.conn:
-            stop = {"id":str(row[0]),"latitude":str(row[1]),"longitude":str(row[2]),"description":row[3],"name":row[4]}
-            stops["%02d" % (int(route_id),)][row[0]]=stop
-        return stops
+        try:
+            sql_query = """
+            SELECT DISTINCT S.stop_id,S.stop_lat,S.stop_lon,S.stop_desc,S.stop_name
+            FROM stops S INNER JOIN stop_times T ON S.stop_id=T.stop_id
+            WHERE trip_id=(SELECT trip_id FROM trips WHERE route_id=%s AND direction_id=0 LIMIT 1) OR trip_id=(SELECT trip_id FROM trips WHERE route_id=%s AND direction_id=1 LIMIT 1);
+            """
+            self.conn.execute(sql_query,(route_id,route_id))
+            stops={}
+            stops["%02d" % (int(route_id),)]={}
+            for row in self.conn:
+                stop = {"id":str(row[0]),"latitude":str(row[1]),"longitude":str(row[2]),"description":row[3],"name":row[4]}
+                stops["%02d" % (int(route_id),)][row[0]]=stop
+            return stops
+        except Exception, e:
+            print("SQL ERROR: " + str(e))
     
     def fullUpdate(self):
         self.clearSqlGtfs()

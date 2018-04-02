@@ -25,45 +25,11 @@ fb_base_url=auth.fb_base_url
 feed_url=auth.feed_url
 trip_feed_url=auth.trip_feed_url
 vehicle_feed_url=auth.vehicle_feed_url
-route_number_dict = {
-  "8540":"01",
-  "8541":"02",
-  "8542":"03",
-  "8543":"04",
-  "8544":"05",
-  "8545":"06",
-  "8546":"07",
-  "8547":"08",
-  "8548":"09",
-  "8549":"10",
-  "8550":"11",
-  "8551":"12",
-  "8552":"13",
-  "8553":"14",
-  "8554":"15",
-  "8555":"16",
-  "8556":"20",
-  "8557":"22",
-  "8558":"23",
-  "8559":"24",
-  "8560":"25",
-  "8561":"26",
-  "8562":"261",
-  "8563":"30",
-  "8564":"31",
-  "8565":"32",
-  "8566":"33",
-  "8567":"34",
-  "8568":"35",
-  "8569":"36",
-  "8570":"39",
-  "8571":"46",
-  "8572":"48"
-}
+route_number_dict = {}
 
 def getCurrentTime():
   return int(round(time.time()*1000))
-          
+            
 def waitForUpdate(in_time = None):
   feed = gtfs_realtime_pb2.FeedMessage()
   feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
@@ -159,8 +125,8 @@ def updateBuses():
       bus_latitude = entity.vehicle.position.latitude
       bus_longitude = entity.vehicle.position.longitude
       bus_bearing = entity.vehicle.position.bearing
+      bus_route_number = entity.vehicle.trip.route_id
       bus_route_number = route_number_dict[entity.vehicle.trip.route_id]
-      bus_trip_id = entity.vehicle.trip.trip_id
       if(buses.has_key(bus_route_number)):
         buses[bus_route_number][bus_id]={"bus":str(bus_id),"latitude":str(bus_latitude),"longitude":str(bus_longitude),"route":str(bus_route_number),"bearing":str(bus_bearing)}
       else:
@@ -172,6 +138,10 @@ def updateBuses():
     print("updateTrips - Error: " + str(e))
     return False
 
+def addRouteIdToDict(route_id, trip_id, gtfs_sql):
+  route_number = gtfs_sql.getRouteNumberFromTripId(trip_id)
+  route_number_dict[route_id] = str("%02d" % (int(route_number)))
+
 def updateTrips():
   try:
     trip_feed = gtfs_realtime_pb2.FeedMessage()
@@ -182,8 +152,9 @@ def updateTrips():
       try:
         route_number=route_number_dict[entity.trip_update.trip.route_id]
       except Exception, e:
-        print("route_number not in route_number_dict: " + str(e))
-        route_number=entity.trip_update.trip.route_id
+        print("route_number not in route_number_dict: " + str(e) + " for trip_id: " + trip_id + "... adding it")
+        addRouteIdToDict(entity.trip_update.trip.route_id, trip_id,gtfs_sql)
+        route_number=route_number_dict[entity.trip_update.trip.route_id]
       bus_id=entity.trip_update.vehicle.id
       
       for stop in entity.trip_update.stop_time_update:
@@ -219,7 +190,7 @@ timer = getCurrentTime()
 feed_timestamp = waitForUpdate()
 print("Starting main loop")
 while(True):
-  if(getCurrentTime() - timer >= (1000*60*60*24*7)):
+  if(getCurrentTime() - timer >= (1000*60*60*24*1)):
     print("GTFS timer complete, starting full gtfs update")
     updateStops(gtfs_sql)
     gtfs_sql.fullUpdate()
