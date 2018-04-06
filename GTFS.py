@@ -40,6 +40,9 @@ class GTFS:
     def executeQuery(self, query, params=()):
         self.conn.execute(query, params)
         return self.conn.fetchall()
+      
+    def reconnect(self):
+        self.db.ping(True)
         
     def getRouteNumberFromTripId(self, trip_id):
         try:
