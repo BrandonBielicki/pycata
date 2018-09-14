@@ -149,7 +149,7 @@ class GTFS:
         
     def uploadGtfs(self):
         self.loadFile(self.conn,"shapes.txt","shapes","")
-        self.loadFile(self.conn,"trips.txt","trips","(block_id,@col2,route_id,@col4,direction_id,trip_headsign,shape_id,service_id,trip_id,@col10)")
-        self.loadFile(self.conn,"stops.txt","stops","(stop_lat,@col2,stop_code,stop_lon,@col5,@col6,@col7,stop_desc,stop_name,@col10,stop_id,@col12)")
-        self.loadFile(self.conn,"routes.txt","routes","(route_long_name,@col2,@col3,route_color,@col5,route_id,@col7,@col8,@col9)")
+        self.loadFile(self.conn,"trips.txt","trips","(route_id,service_id,trip_id,trip_headsign,@col5,direction_id,@col7,shape_id,@col9,@col10)")
+        self.loadFile(self.conn,"stops.txt","stops","(stop_id,stop_code,stop_name,stop_desc,stop_lat,stop_lon,@col7,@col8,@col9,@col10,@col11,@col12)")
+        self.loadFile(self.conn,"routes.txt","routes","(route_id,@col2,@col3,route_long_name,@col5,@col6,@col7,route_color,@col9)")
         self.loadFile(self.conn,"stop_times.txt","stop_times","(trip_id,arrival_time,departure_time,stop_id,stop_sequence,@col6,@col7,@col8,@col9,@col10)")

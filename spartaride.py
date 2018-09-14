@@ -32,7 +32,10 @@ def getCurrentTime():
             
 def waitForUpdate(in_time = None):
   feed = gtfs_realtime_pb2.FeedMessage()
-  feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
+  try:
+    feed.ParseFromString(urllib2.urlopen(vehicle_feed_url).read())
+  except Exception, e:
+      print("ERROR opening vehicle feed url: " + str(e))
   if(in_time == None):
     timestamp1 = feed.header.timestamp
   else:
@@ -140,7 +143,7 @@ def updateBuses():
     return False
 
 def addRouteIdToDict(route_id, trip_id, gtfs_sql):
-  gtfs_sql.reconnect()    
+  gtfs_sql.reconnect()
   route_number = gtfs_sql.getRouteNumberFromTripId(trip_id)
   route_number_dict[route_id] = str("%02d" % (int(route_number)))
 
